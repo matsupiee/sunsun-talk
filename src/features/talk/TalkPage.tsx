@@ -345,6 +345,7 @@ export function TalkPage() {
       className={cn(
         "relative flex min-h-[100svh] w-full flex-col items-center",
         "px-[clamp(14px,4vw,40px)] pt-[clamp(18px,3.4vh,42px)] pb-[clamp(18px,3.4vh,52px)]",
+        "max-[680px]:px-0 max-[680px]:pt-[10px] max-[680px]:pb-0",
       )}
       style={{ background: PAGE_BG, color: INK }}
       data-period={period}
@@ -357,35 +358,37 @@ export function TalkPage() {
       />
 
       {/* title lockup — the header logo stays as the wordmark */}
-      <header className="relative z-[1] mb-[clamp(12px,2.2vh,22px)] shrink-0 text-center">
+      <header className="relative z-[1] mb-[clamp(12px,2.2vh,22px)] shrink-0 text-center max-[680px]:mb-[8px]">
         <div
-          className="mb-[6px] pl-[0.4em] text-[12px] font-semibold tracking-[0.4em]"
+          className="mb-[6px] pl-[0.4em] text-[12px] font-semibold tracking-[0.4em] max-[680px]:hidden"
           style={{ fontFamily: "'Zilla Slab', serif", color: INK }}
         >
           PUPPET SUNSUN
         </div>
         <h1 className="m-0 leading-[0]">
           <img
-            className="mx-auto block h-auto w-[clamp(150px,42vw,280px)] max-w-full select-none object-contain [-webkit-user-drag:none]"
+            className="mx-auto block h-auto w-[clamp(150px,42vw,280px)] max-w-full select-none object-contain [-webkit-user-drag:none] max-[680px]:w-[168px]"
             src="/assets/header_logo.png"
             alt="PUPPET TALK"
             style={{ filter: "brightness(0)" }}
           />
         </h1>
-        <p className="mx-auto mt-[8px] mb-0 max-w-[340px] text-[13px] font-medium" style={{ color: "#8a7648" }}>
+        <p
+          className="mx-auto mt-[8px] mb-0 max-w-[340px] text-[13px] font-medium max-[680px]:hidden"
+          style={{ color: "#8a7648" }}
+        >
           文字で話しかけると、スンスンが動いてお返事するよ♪
         </p>
       </header>
 
       {/* ============ PHONE FRAME ============ */}
       <section
-        className="relative z-[1] flex w-[min(420px,94vw)] min-h-0 max-h-[812px] flex-1 flex-col overflow-hidden"
-        style={{
-          background: PANEL_BG,
-          border: `4px solid ${INK}`,
-          borderRadius: 46,
-          boxShadow: "0 22px 50px -12px rgba(0,0,0,.4)",
-        }}
+        className={cn(
+          "relative z-[1] flex w-[min(420px,94vw)] min-h-0 max-h-[812px] flex-1 flex-col overflow-hidden",
+          "rounded-[46px] border-4 border-[#16130E] shadow-[0_22px_50px_-12px_rgba(0,0,0,0.4)]",
+          "max-[680px]:w-full max-[680px]:max-h-none max-[680px]:rounded-none max-[680px]:border-0 max-[680px]:shadow-none",
+        )}
+        style={{ background: PANEL_BG }}
         aria-label="おしゃべりステージ"
       >
         {/* ===== STAGE ===== */}
