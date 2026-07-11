@@ -33,8 +33,25 @@ export function registerTalkRoute(app: ServerApp) {
       return c.json({ error: "text is required" }, 400);
     }
 
+    let reply: string;
     try {
-      const reply = await generateText(c.env, text, history);
+      reply = await generateText(c.env, text, history);
+    } catch (error) {
+      console.error(error);
+
+      const response: TalkResponse = {
+        input: text,
+        reply: replyFor(text),
+        audioUrl: null,
+        audioContentType: null,
+        mode: "fallback",
+        warning: "OpenAI text generation failed; returned local fallback reply.",
+      };
+
+      return c.json(response, 200);
+    }
+
+    try {
       const speech = await generateSpeech(c.env, reply);
       const response: TalkResponse = {
         input: text,
@@ -50,11 +67,11 @@ export function registerTalkRoute(app: ServerApp) {
 
       const response: TalkResponse = {
         input: text,
-        reply: replyFor(text),
+        reply,
         audioUrl: null,
         audioContentType: null,
-        mode: "fallback",
-        warning: "OpenAI generation failed; returned local fallback reply.",
+        mode: c.env.OPENAI_API_KEY ? "openai" : "fallback",
+        warning: "OpenAI speech generation failed; returned text reply without audio.",
       };
 
       return c.json(response, 200);
