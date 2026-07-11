@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type CSSProperties } from "react";
 import {
   QUICK_REPLIES,
   RESPONSE_STICKERS,
@@ -15,6 +15,7 @@ import {
 } from "./talk";
 
 type Sender = "user" | "puppet";
+type PuppetMode = "sticker" | "video" | "fallback";
 
 interface Message {
   id: number;
@@ -27,13 +28,125 @@ interface Clip {
   src: string;
 }
 
+interface ThemeStyle {
+  appBg: string;
+  backdropBg: string;
+  textColor: string;
+  accent: string;
+  accentDark: string;
+  user: string;
+  bubble: string;
+  bubbleForeground: string;
+  panel: string;
+  panelStrong: string;
+  line: string;
+  focusRing: string;
+  talkPanelBg: string;
+  talkPanelBorder: string;
+  talkPanelShadow: string;
+}
+
+function cn(...classes: Array<string | false | undefined | null>) {
+  return classes.filter(Boolean).join(" ");
+}
+
+const THEME: Record<PeriodKey, ThemeStyle> = {
+  morning: {
+    appBg:
+      "linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 252, 235, 0.32)), url('/assets/backgrounds/morning.png'), linear-gradient(140deg, #ffe3b8 0%, #a9dfff 48%, #dcf7e7 100%)",
+    backdropBg:
+      "linear-gradient(90deg, rgba(255, 255, 255, 0.46), transparent 36%, transparent 64%, rgba(255, 255, 255, 0.2)), radial-gradient(circle at 50% 106%, rgba(255, 255, 255, 0.84), transparent 22rem)",
+    textColor: "#15211d",
+    accent: "#e8783f",
+    accentDark: "#b84f29",
+    user: "#d46035",
+    bubble: "#f8fffb",
+    bubbleForeground: "#15211d",
+    panel: "rgba(255, 255, 255, 0.78)",
+    panelStrong: "rgba(255, 255, 255, 0.92)",
+    line: "rgba(21, 33, 29, 0.12)",
+    focusRing: "rgba(232, 120, 63, 0.16)",
+    talkPanelBg: "rgba(255, 255, 255, 0.78)",
+    talkPanelBorder: "rgba(255, 255, 255, 0.56)",
+    talkPanelShadow: "0 24px 70px rgba(22, 58, 47, 0.16)",
+  },
+  day: {
+    appBg:
+      "linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(234, 255, 249, 0.28)), url('/assets/backgrounds/day.jpg'), linear-gradient(135deg, #bdeaff 0%, #f7f0c7 54%, #c7efd4 100%)",
+    backdropBg:
+      "linear-gradient(90deg, rgba(255, 255, 255, 0.46), transparent 36%, transparent 64%, rgba(255, 255, 255, 0.2)), radial-gradient(circle at 50% 106%, rgba(255, 255, 255, 0.84), transparent 22rem)",
+    textColor: "#15211d",
+    accent: "#1d8f72",
+    accentDark: "#0f5f4b",
+    user: "#1d8f72",
+    bubble: "#f8fffb",
+    bubbleForeground: "#15211d",
+    panel: "rgba(255, 255, 255, 0.78)",
+    panelStrong: "rgba(255, 255, 255, 0.92)",
+    line: "rgba(21, 33, 29, 0.12)",
+    focusRing: "rgba(29, 143, 114, 0.16)",
+    talkPanelBg: "rgba(255, 255, 255, 0.78)",
+    talkPanelBorder: "rgba(255, 255, 255, 0.56)",
+    talkPanelShadow: "0 24px 70px rgba(22, 58, 47, 0.16)",
+  },
+  evening: {
+    appBg:
+      "linear-gradient(180deg, rgba(255, 247, 230, 0.02), rgba(70, 30, 44, 0.16)), url('/assets/backgrounds/evening.png'), linear-gradient(140deg, #ffc08f 0%, #f5a2ba 48%, #88bfd1 100%)",
+    backdropBg:
+      "linear-gradient(90deg, rgba(255, 255, 255, 0.46), transparent 36%, transparent 64%, rgba(255, 255, 255, 0.2)), radial-gradient(circle at 50% 106%, rgba(255, 255, 255, 0.84), transparent 22rem)",
+    textColor: "#15211d",
+    accent: "#bd5d80",
+    accentDark: "#87405a",
+    user: "#a44e70",
+    bubble: "#f8fffb",
+    bubbleForeground: "#15211d",
+    panel: "rgba(255, 255, 255, 0.78)",
+    panelStrong: "rgba(255, 255, 255, 0.92)",
+    line: "rgba(21, 33, 29, 0.12)",
+    focusRing: "rgba(189, 93, 128, 0.16)",
+    talkPanelBg: "rgba(255, 255, 255, 0.78)",
+    talkPanelBorder: "rgba(255, 255, 255, 0.56)",
+    talkPanelShadow: "0 24px 70px rgba(22, 58, 47, 0.16)",
+  },
+  night: {
+    appBg:
+      "linear-gradient(180deg, rgba(16, 25, 58, 0.08), rgba(8, 15, 42, 0.38)), url('/assets/backgrounds/night.jpg'), linear-gradient(145deg, #213a72 0%, #735a99 52%, #b7d7dc 100%)",
+    backdropBg:
+      "linear-gradient(90deg, rgba(9, 14, 36, 0.28), transparent 38%, transparent 64%, rgba(9, 14, 36, 0.22)), radial-gradient(circle at 50% 108%, rgba(255, 255, 255, 0.2), transparent 22rem)",
+    textColor: "#f7fbff",
+    accent: "#557bd7",
+    accentDark: "#304e98",
+    user: "#4a66bd",
+    bubble: "#f8fffb",
+    bubbleForeground: "#14201d",
+    panel: "rgba(255, 255, 255, 0.78)",
+    panelStrong: "rgba(255, 255, 255, 0.92)",
+    line: "rgba(255, 255, 255, 0.2)",
+    focusRing: "rgba(85, 123, 215, 0.16)",
+    talkPanelBg: "rgba(13, 22, 52, 0.6)",
+    talkPanelBorder: "rgba(255, 255, 255, 0.18)",
+    talkPanelShadow: "0 24px 70px rgba(3, 7, 20, 0.35)",
+  },
+};
+
 const INITIAL_STICKER = `${STICKER_BASE}/animation@2x/${STICKER_IDS[0]}@2x.png`;
+const puppetBodyStyle: CSSProperties = {
+  background:
+    "radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.92), transparent 0.82rem), radial-gradient(circle at 60% 32%, rgba(255, 255, 255, 0.88), transparent 0.72rem), linear-gradient(160deg, #f8fffc 0%, #e1efe8 74%, #c0d9cf 100%)",
+  boxShadow:
+    "inset -28px -28px 52px rgba(32, 80, 66, 0.13), inset 22px 24px 34px rgba(255, 255, 255, 0.72), 0 40px 54px rgba(24, 53, 45, 0.24)",
+};
 
 export function TalkPage() {
   const [period, setPeriod] = useState<PeriodKey>(() => getPeriod().key);
   const [messages, setMessages] = useState<Message[]>([
     { id: 0, text: "こんにちは！", sender: "puppet" },
   ]);
+  const [puppetMode, setPuppetMode] = useState<PuppetMode>("sticker");
+  const [stickerSrc, setStickerSrc] = useState(INITIAL_STICKER);
+  const [stickerAnimationKey, setStickerAnimationKey] = useState(0);
+  const [isStickerTalking, setIsStickerTalking] = useState(false);
+  const [isFallbackTalking, setIsFallbackTalking] = useState(false);
 
   const messageId = useRef(1);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -41,7 +154,6 @@ export function TalkPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const stickerRef = useRef<HTMLImageElement>(null);
   const stickerSoundRef = useRef<HTMLAudioElement>(null);
-  const fallbackRef = useRef<HTMLDivElement>(null);
 
   const clips = useRef<Clip[]>([]);
   const stickers = useRef<Sticker[]>(buildStickers(STICKER_IDS));
@@ -49,6 +161,29 @@ export function TalkPage() {
   const lastStickerId = useRef(0);
   const talkingTimer = useRef(0);
   const chainTimer = useRef(0);
+
+  const theme = THEME[period];
+  const isStickerMode = puppetMode === "sticker";
+  const isVideoMode = puppetMode === "video";
+  const themeVars = {
+    "--ink": "#15211d",
+    "--muted": "rgba(21, 33, 29, 0.64)",
+    "--panel": theme.panel,
+    "--panel-strong": theme.panelStrong,
+    "--line": theme.line,
+    "--accent": theme.accent,
+    "--accent-dark": theme.accentDark,
+    "--bubble": theme.bubble,
+    "--user": theme.user,
+    "--bubble-fg": theme.bubbleForeground,
+    "--focus-ring": theme.focusRing,
+  } as CSSProperties;
+
+  const talkPanelStyle: CSSProperties = {
+    backgroundColor: theme.talkPanelBg,
+    borderColor: theme.talkPanelBorder,
+    boxShadow: theme.talkPanelShadow,
+  };
 
   function appendMessage(text: string, sender: Sender) {
     setMessages((prev) => [...prev, { id: messageId.current++, text, sender }]);
@@ -77,20 +212,19 @@ export function TalkPage() {
 
   function startTalking(duration = 1300) {
     window.clearTimeout(talkingTimer.current);
-    fallbackRef.current?.classList.add("is-talking");
+    setIsFallbackTalking(true);
     talkingTimer.current = window.setTimeout(() => {
-      fallbackRef.current?.classList.remove("is-talking");
+      setIsFallbackTalking(false);
     }, duration);
   }
 
   function playSticker(sticker: Sticker | null, { sound = true }: { sound?: boolean } = {}) {
     const stickerImage = stickerRef.current;
     const video = videoRef.current;
-    const fallbackPuppet = fallbackRef.current;
     const stickerSound = stickerSoundRef.current;
 
     if (!sticker || !stickerImage) {
-      fallbackPuppet?.classList.add("is-active");
+      setPuppetMode("fallback");
       startTalking();
       return;
     }
@@ -98,15 +232,17 @@ export function TalkPage() {
     lastStickerId.current = sticker.id;
     window.clearTimeout(chainTimer.current);
     video?.pause();
-    video?.classList.remove("is-active");
-    fallbackPuppet?.classList.remove("is-active");
-    stickerImage.classList.add("is-active");
-    stickerImage.classList.remove("is-talking");
 
+    setPuppetMode("sticker");
+    setIsStickerTalking(false);
+    setStickerAnimationKey((key) => key + 1);
     stickerImage.src = `${sticker.image}?run=${Date.now()}`;
-    stickerImage.alt = "パペットステッカー";
-    void stickerImage.offsetWidth;
-    stickerImage.classList.add("is-talking");
+    setStickerSrc(stickerImage.src);
+
+    // Re-apply a short talking animation for each new sticker.
+    window.setTimeout(() => {
+      setIsStickerTalking(true);
+    }, 0);
 
     if (sound && stickerSound) {
       stickerSound.pause();
@@ -134,15 +270,13 @@ export function TalkPage() {
 
     if (!clips.current.length || !video) {
       video?.pause();
-      video?.classList.remove("is-active");
       playSticker(randomSticker(), { sound: false });
       return;
     }
 
     const clip = clips.current[pickClipIndex()];
-    stickerRef.current?.classList.remove("is-active");
-    fallbackRef.current?.classList.remove("is-active");
-    video.classList.add("is-active");
+    setPuppetMode("video");
+    setIsFallbackTalking(false);
 
     if (video.src !== clip.src) {
       video.src = clip.src;
@@ -152,7 +286,7 @@ export function TalkPage() {
       video.currentTime = 0;
       await video.play();
     } catch {
-      video.classList.remove("is-active");
+      setPuppetMode("sticker");
       playSticker(randomSticker(), { sound: false });
     }
   }
@@ -236,14 +370,14 @@ export function TalkPage() {
 
     async function loadManifestClips() {
       try {
-        const response = await fetch("/assets/clips/manifest.json", { cache: "no-store" });
+        const response = await fetch('/assets/clips/manifest.json', { cache: 'no-store' });
         if (!response.ok) return;
 
         const manifest = (await response.json()) as { clips?: Array<{ name?: string; src?: unknown }> };
         const items = Array.isArray(manifest.clips) ? manifest.clips : [];
         const loaded: Clip[] = items
           .filter((item): item is { name?: string; src: string } =>
-            Boolean(item && typeof item.src === "string" && item.src.trim()),
+            Boolean(item && typeof item.src === 'string' && item.src.trim()),
           )
           .map((item, index) => ({
             name: item.name || `clip-${index + 1}`,
@@ -270,30 +404,65 @@ export function TalkPage() {
   }, []);
 
   return (
-    <main className="app" data-period={period}>
-      <section className="stage" aria-label="おしゃべりステージ">
-        <div className="backdrop" aria-hidden="true" />
+    <main
+      className={cn(
+        "min-h-[100svh] bg-cover bg-center bg-no-repeat transition-[background] duration-700",
+        "text-[var(--ink)]",
+      )}
+      style={{
+        ...themeVars,
+        backgroundImage: theme.appBg,
+        color: theme.textColor,
+      }}
+      data-period={period}
+    >
+      <section
+        className={cn(
+          "relative grid min-h-[620px] h-[100svh] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden isolate",
+          "p-[clamp(18px,3vw,34px)]",
+          "max-[680px]:h-[100svh] max-[680px]:min-h-[100svh] max-[680px]:p-[16px]",
+        )}
+        aria-label="おしゃべりステージ"
+      >
+        <div
+          className="absolute inset-0 -z-10 pointer-events-none"
+          style={{ backgroundImage: theme.backdropBg }}
+          aria-hidden="true"
+        />
 
         <header className="mx-auto flex w-full max-w-[1040px] min-w-0 items-start justify-start max-[680px]:items-center">
           <h1 className="m-0 leading-[0]">
             <img
-              className="block h-auto w-[clamp(110px,21vw,260px)] max-w-full select-none object-contain mix-blend-screen [-webkit-user-drag:none]"
+              className="block h-auto w-[clamp(110px,21vw,260px)] max-w-full select-none object-contain [mix-blend-mode:screen] [-webkit-user-drag:none]"
               src="/assets/header_logo.png"
               alt="PUPPET TALK"
             />
           </h1>
         </header>
 
-        <div className="puppetWrap" aria-live="polite">
+        <div className="relative self-center justify-self-center grid place-items-center w-[min(42svh,390px)] max-w-[82vw] max-h-full aspect-square mx-auto m-[clamp(4px,2svh,22px)] max-[680px]:w-[min(37svh,84vw)]">
           <img
             ref={stickerRef}
-            id="stickerPuppet"
-            className="stickerPuppet is-active"
-            src={INITIAL_STICKER}
+            key={stickerAnimationKey}
+            className={cn(
+              "hidden w-[min(100%,390px)] max-h-full object-contain",
+              "[filter:drop-shadow(0_34px_34px_rgba(24,53,45,0.26))]",
+              "[transform-origin:50%_82%] select-none [-webkit-user-drag:none]",
+              isStickerMode && "block",
+            )}
+            src={stickerSrc}
             alt="パペットステッカー"
+            style={
+              puppetMode === "sticker"
+                ? {
+                    animation: isStickerTalking
+                      ? "stickerPop 900ms ease both, puppetFloat 2.6s ease-in-out infinite 0.9s"
+                      : "puppetFloat 2.6s ease-in-out infinite",
+                  }
+                : undefined
+            }
             onError={() => {
-              stickerRef.current?.classList.remove("is-active");
-              fallbackRef.current?.classList.add("is-active");
+              setPuppetMode("fallback");
               startTalking();
             }}
           />
@@ -301,61 +470,165 @@ export function TalkPage() {
           <video
             ref={videoRef}
             id="puppetVideo"
-            className="puppetVideo"
+            className={cn(
+              "hidden w-full h-full object-cover",
+              "[border-radius:44%_44%_38%_38%] [filter:drop-shadow(0_38px_44px_rgba(24,53,45,0.26))]",
+              "[transform-origin:50%_80%]",
+              isVideoMode &&
+                "block animate-[puppetFloat_2.4s_ease-in-out_infinite]",
+            )}
             muted
             playsInline
             preload="metadata"
             aria-label="パペット動画"
             onEnded={scheduleNextClip}
             onError={() => {
-              videoRef.current?.classList.remove("is-active");
+              if (videoRef.current) {
+                videoRef.current.pause();
+              }
               playSticker(randomSticker(), { sound: false });
             }}
           />
 
-          <div ref={fallbackRef} id="fallbackPuppet" className="fallbackPuppet" aria-hidden="true">
-            <div className="puppetBody">
-              <span className="eye eyeLeft" />
-              <span className="eye eyeRight" />
-              <span className="mouth" />
+          <div
+            className={cn("absolute inset-0 hidden place-items-center", puppetMode === "fallback" && "grid")}
+            aria-hidden="true"
+          >
+            <div
+              className="relative w-[76%] aspect-[0.9] [border-radius:48%_48%_42%_42%] [transform-origin:50%_80%]"
+              style={{
+                ...puppetBodyStyle,
+                animation: isFallbackTalking
+                  ? "puppetFloat 1.4s ease-in-out infinite, talkBounce 420ms ease-in-out infinite"
+                  : "puppetFloat 2.4s ease-in-out infinite",
+              }}
+            >
+              <span
+                className="absolute top-[38%] left-[34%] w-[10%] aspect-square rounded-full bg-[#15211d] [box-shadow:inset_0_-2px_0_rgba(255,255,255,0.18)]"
+                aria-hidden="true"
+              />
+              <span
+                className="absolute top-[38%] right-[34%] w-[10%] aspect-square rounded-full bg-[#15211d] [box-shadow:inset_0_-2px_0_rgba(255,255,255,0.18)]"
+                aria-hidden="true"
+              />
+              <span
+                className="absolute left-1/2 top-[54%] w-[15%] rounded-b-[999px] rounded-t-[0] border-b-[4px] border-[#15211d]"
+                style={
+                  isFallbackTalking
+                    ? {
+                        height: "10%",
+                        borderWidth: "0",
+                        background: "#15211d",
+                        animation: "mouthTalk 280ms ease-in-out infinite",
+                        transform: "translateX(-50%)",
+                        transformOrigin: "50% 0",
+                      }
+                    : {
+                        height: "5%",
+                        animation: "none",
+                        transform: "translateX(-50%)",
+                        transformOrigin: "50% 0",
+                      }
+                }
+                aria-hidden="true"
+              />
             </div>
-            <div className="shadow" />
+            <div
+              className="absolute bottom-[9%] w-[56%] h-[10%] rounded-full bg-[rgba(25,43,37,0.16)] blur-[10px]"
+              style={{ animation: "shadowPulse 2.4s ease-in-out infinite" }}
+              aria-hidden="true"
+            />
           </div>
         </div>
         <audio ref={stickerSoundRef} id="stickerSound" preload="auto" />
 
-        <section className="talkPanel" aria-label="会話">
-          <div ref={messagesRef} id="messages" className="messages">
+        <section
+          className={cn(
+            "flex flex-col w-full max-w-[720px] min-w-0 min-h-[188px] h-[min(31svh,240px)] mx-auto",
+            "rounded-[28px] border border-[rgba(255,255,255,0.56)] bg-[var(--panel)] p-[14px]",
+            "[backdrop-filter:blur(22px)]",
+            "max-[680px]:h-[min(32svh,232px)] max-[680px]:min-h-[182px] max-[680px]:rounded-[22px] max-[680px]:p-[12px]",
+          )}
+          style={talkPanelStyle}
+          aria-label="会話"
+        >
+          <div
+            ref={messagesRef}
+            id="messages"
+            className={cn(
+              "flex-1 min-w-0 min-h-0 w-full flex flex-col gap-2 overflow-auto px-[2px] pt-[2px] pb-[10px]",
+              "[scrollbar-width:thin]",
+            )}
+          >
             {messages.map((message) => (
-              <div key={message.id} className={`bubble ${message.sender}`}>
+              <div
+                key={message.id}
+                className={cn(
+                  "w-fit max-w-[82%] rounded-[18px] px-[14px] py-[10px] font-black leading-[1.45] animate-[bubbleIn_240ms_ease_both]",
+                  message.sender === "puppet"
+                    ? "rounded-bl-[7px] text-[var(--bubble-fg)] bg-[var(--bubble)]"
+                    : "self-end rounded-br-[7px] text-white bg-[var(--user)]",
+                  "max-[680px]:max-w-[92%] max-[680px]:text-[0.98rem]",
+                )}
+              >
                 {message.text}
               </div>
             ))}
           </div>
 
-          <div className="quickReplies" aria-label="入力候補">
+          <div
+            className={cn(
+              "w-full min-w-0 flex gap-2 pt-[3px] pb-[12px] overflow-x-auto overflow-y-hidden",
+              "[scrollbar-width:thin]",
+            )}
+            aria-label="入力候補"
+          >
             {QUICK_REPLIES.map((label) => (
-              <button key={label} type="button" onClick={() => handleSay(label)}>
+              <button
+                key={label}
+                type="button"
+                onClick={() => handleSay(label)}
+                className={cn(
+                  "inline-flex items-center justify-center min-h-[38px] px-[13px] rounded-full whitespace-nowrap",
+                  "font-black text-[var(--accent-dark)] bg-[rgba(255,255,255,0.72)] transition-[transform,background,color] duration-180",
+                  "hover:bg-[var(--accent)] hover:text-white focus-visible:bg-[var(--accent)] focus-visible:text-white focus-visible:outline-none",
+                  "hover:-translate-y-px focus-visible:-translate-y-px",
+                  "max-[680px]:min-h-[36px] max-[680px]:px-[11px] max-[680px]:text-[0.88rem]",
+                )}
+              >
                 {label}
               </button>
             ))}
           </div>
 
-          <form className="composer" onSubmit={handleSubmit}>
-            <label className="clipButton" title="ローカル動画を追加">
+          <form className="grid w-full min-w-0 grid-cols-[auto_1fr_auto] gap-2 items-center" onSubmit={handleSubmit}>
+            <label
+              className={cn(
+                "relative inline-grid h-[46px] w-[46px] place-items-center overflow-hidden [grid-template-columns:1fr] rounded-full bg-[var(--panel-strong)] text-[var(--accent-dark)]",
+                "transition-[transform,background,color] duration-180 cursor-pointer",
+                "hover:bg-[var(--accent)] hover:text-white hover:-translate-y-px",
+                "focus-visible:bg-[var(--accent)] focus-visible:text-white focus-visible:outline-none focus-visible:-translate-y-px",
+              )}
+              title="ローカル動画を追加"
+            >
               <input
                 type="file"
                 accept="video/mp4,video/webm,video/quicktime"
                 multiple
+                className="absolute inset-0 opacity-0 cursor-pointer"
                 onChange={(event) => {
                   addPickedClips(event.target.files);
                   event.target.value = "";
                 }}
               />
-              <svg viewBox="0 0 24 24" aria-hidden="true">
+              <svg
+                className="w-[22px] h-[22px] fill-none stroke-current [stroke-width:2.3] [stroke-linecap:round] [stroke-linejoin:round] pointer-events-none"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
                 <path d="M12 5v14M5 12h14" />
               </svg>
-              <span>clips</span>
+              <span className="absolute w-px h-px overflow-hidden [clip:rect(0,0,0,0)]">clips</span>
             </label>
             <input
               ref={inputRef}
@@ -363,9 +636,30 @@ export function TalkPage() {
               autoComplete="off"
               placeholder="話しかける"
               aria-label="話しかける"
+              className={cn(
+                "min-w-0 h-[46px] border border-[rgba(21,33,29,0.1)] rounded-full px-[16px] text-[var(--ink)] bg-[var(--panel-strong)]",
+                "outline-none transition-[border-color,box-shadow] duration-180",
+                "focus:border-[var(--accent)] focus-visible:outline-none",
+                "focus-visible:[box-shadow:0_0_0_4px_var(--focus-ring)]",
+                "placeholder:text-[var(--muted)]",
+              )}
             />
-            <button className="sendButton" type="submit" title="送信" aria-label="送信">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
+            <button
+              className={cn(
+                "inline-grid h-[46px] w-[46px] place-items-center rounded-full bg-[var(--panel-strong)] text-[var(--accent-dark)]",
+                "transition-[transform,background,color] duration-180",
+                "hover:bg-[var(--accent)] hover:text-white hover:-translate-y-px",
+                "focus-visible:bg-[var(--accent)] focus-visible:text-white focus-visible:outline-none focus-visible:-translate-y-px",
+              )}
+              type="submit"
+              title="送信"
+              aria-label="送信"
+            >
+              <svg
+                className="w-[22px] h-[22px] fill-none stroke-current [stroke-width:2.3] [stroke-linecap:round] [stroke-linejoin:round] pointer-events-none"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
                 <path d="m5 12 14-7-4 14-3-6-7-1Z" />
               </svg>
             </button>

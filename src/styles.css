@@ -2,16 +2,6 @@
 
 :root {
   color-scheme: light;
-  --ink: #15211d;
-  --muted: rgba(21, 33, 29, 0.64);
-  --panel: rgba(255, 255, 255, 0.78);
-  --panel-strong: rgba(255, 255, 255, 0.92);
-  --line: rgba(21, 33, 29, 0.12);
-  --accent: #1d8f72;
-  --accent-dark: #0f5f4b;
-  --bubble: #f8fffb;
-  --user: #1d8f72;
-  --bg-image: none;
   font-family:
     ui-rounded, "Hiragino Maru Gothic ProN", "Yu Gothic", system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
@@ -29,7 +19,7 @@ body {
 
 body {
   overflow: hidden;
-  color: var(--ink);
+  color: #15211d;
   background: #e9f5f0;
 }
 
@@ -43,509 +33,9 @@ button {
   cursor: pointer;
 }
 
-.app {
-  min-height: 100svh;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.28)),
-    radial-gradient(circle at 16% 18%, rgba(255, 255, 255, 0.9), transparent 26rem),
-    linear-gradient(135deg, #c9ecff 0%, #fff4d8 58%, #d8f4e7 100%);
-  transition: background 700ms ease;
-}
-
-.app[data-period="morning"] {
-  --accent: #e8783f;
-  --accent-dark: #b84f29;
-  --user: #d46035;
-  --bg-image: url("/assets/backgrounds/morning.png");
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 252, 235, 0.32)),
-    var(--bg-image),
-    linear-gradient(140deg, #ffe3b8 0%, #a9dfff 48%, #dcf7e7 100%);
-}
-
-.app[data-period="day"] {
-  --accent: #1d8f72;
-  --accent-dark: #0f5f4b;
-  --user: #1d8f72;
-  --bg-image: url("/assets/backgrounds/day.jpg");
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(234, 255, 249, 0.28)),
-    var(--bg-image),
-    linear-gradient(135deg, #bdeaff 0%, #f7f0c7 54%, #c7efd4 100%);
-}
-
-.app[data-period="evening"] {
-  --accent: #bd5d80;
-  --accent-dark: #87405a;
-  --user: #a44e70;
-  --bg-image: url("/assets/backgrounds/evening.png");
-  background:
-    linear-gradient(180deg, rgba(255, 247, 230, 0.02), rgba(70, 30, 44, 0.16)),
-    var(--bg-image),
-    linear-gradient(140deg, #ffc08f 0%, #f5a2ba 48%, #88bfd1 100%);
-}
-
-.app[data-period="night"] {
-  --accent: #557bd7;
-  --accent-dark: #304e98;
-  --user: #4a66bd;
-  --bg-image: url("/assets/backgrounds/night.jpg");
-  background:
-    linear-gradient(180deg, rgba(16, 25, 58, 0.08), rgba(8, 15, 42, 0.38)),
-    var(--bg-image),
-    linear-gradient(145deg, #213a72 0%, #735a99 52%, #b7d7dc 100%);
-  color: #f7fbff;
-}
-
-.app,
-.app[data-period] {
-  background-position: center;
-  background-size: cover;
-}
-
-.stage {
-  position: relative;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  height: 100svh;
-  min-height: 620px;
-  padding: clamp(18px, 3vw, 34px);
-  overflow: hidden;
-  isolation: isolate;
-}
-
-.backdrop {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.46), transparent 36%, transparent 64%, rgba(255, 255, 255, 0.2)),
-    radial-gradient(circle at 50% 106%, rgba(255, 255, 255, 0.84), transparent 22rem);
-  pointer-events: none;
-}
-
-.app[data-period="night"] .backdrop {
-  background:
-    linear-gradient(90deg, rgba(9, 14, 36, 0.28), transparent 38%, transparent 64%, rgba(9, 14, 36, 0.22)),
-    radial-gradient(circle at 50% 108%, rgba(255, 255, 255, 0.2), transparent 22rem);
-}
-
-.puppetWrap {
-  position: relative;
-  align-self: center;
-  justify-self: center;
-  display: grid;
-  place-items: center;
-  width: min(42svh, 390px);
-  max-width: 82vw;
-  max-height: 100%;
-  aspect-ratio: 1;
-  margin: clamp(4px, 2svh, 22px) auto;
-}
-
-.puppetVideo {
-  display: none;
-  width: 100%;
-  height: 100%;
-  border-radius: 44% 44% 38% 38%;
-  object-fit: cover;
-  filter: drop-shadow(0 38px 44px rgba(24, 53, 45, 0.26));
-  transform-origin: 50% 80%;
-}
-
-.puppetVideo.is-active {
-  display: block;
-  animation: puppetFloat 2.4s ease-in-out infinite;
-}
-
-.stickerPuppet {
-  display: none;
-  width: min(100%, 390px);
-  max-height: 100%;
-  object-fit: contain;
-  filter: drop-shadow(0 34px 34px rgba(24, 53, 45, 0.26));
-  transform-origin: 50% 82%;
-  user-select: none;
-  -webkit-user-drag: none;
-}
-
-.stickerPuppet.is-active {
-  display: block;
-  animation: puppetFloat 2.6s ease-in-out infinite;
-}
-
-.stickerPuppet.is-talking {
-  animation: stickerPop 900ms ease both, puppetFloat 2.6s 900ms ease-in-out infinite;
-}
-
-.fallbackPuppet {
-  display: none;
-  position: absolute;
-  inset: 0;
-  place-items: center;
-}
-
-.fallbackPuppet.is-active {
-  display: grid;
-}
-
-.puppetBody {
-  position: relative;
-  width: 76%;
-  aspect-ratio: 0.9;
-  border-radius: 48% 48% 42% 42%;
-  background:
-    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.92), transparent 0.82rem),
-    radial-gradient(circle at 60% 32%, rgba(255, 255, 255, 0.88), transparent 0.72rem),
-    linear-gradient(160deg, #f8fffc 0%, #e1efe8 74%, #c0d9cf 100%);
-  box-shadow:
-    inset -28px -28px 52px rgba(32, 80, 66, 0.13),
-    inset 22px 24px 34px rgba(255, 255, 255, 0.72),
-    0 40px 54px rgba(24, 53, 45, 0.24);
-  transform-origin: 50% 80%;
-  animation: puppetFloat 2.4s ease-in-out infinite;
-}
-
-.fallbackPuppet.is-talking .puppetBody {
-  animation: puppetFloat 1.4s ease-in-out infinite, talkBounce 420ms ease-in-out infinite;
-}
-
-.eye {
-  position: absolute;
-  top: 38%;
-  width: 10%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: #15211d;
-  box-shadow: inset 0 -2px 0 rgba(255, 255, 255, 0.18);
-}
-
-.eyeLeft {
-  left: 34%;
-}
-
-.eyeRight {
-  right: 34%;
-}
-
-.mouth {
-  position: absolute;
-  left: 50%;
-  top: 54%;
-  width: 15%;
-  height: 5%;
-  border-radius: 0 0 999px 999px;
-  border-bottom: 4px solid #15211d;
-  transform: translateX(-50%);
-  transform-origin: 50% 0;
-}
-
-.fallbackPuppet.is-talking .mouth {
-  height: 10%;
-  border: 0;
-  background: #15211d;
-  animation: mouthTalk 280ms ease-in-out infinite;
-}
-
-.shadow {
-  position: absolute;
-  bottom: 9%;
-  width: 56%;
-  height: 10%;
-  border-radius: 50%;
-  background: rgba(25, 43, 37, 0.16);
-  filter: blur(10px);
-  animation: shadowPulse 2.4s ease-in-out infinite;
-}
-
-.talkPanel {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 720px;
-  min-width: 0;
-  height: min(31svh, 240px);
-  min-height: 188px;
-  margin: 0 auto;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.56);
-  border-radius: 28px;
-  background: var(--panel);
-  box-shadow: 0 24px 70px rgba(22, 58, 47, 0.16);
-  backdrop-filter: blur(22px);
-}
-
-.app[data-period="night"] .talkPanel {
-  background: rgba(13, 22, 52, 0.6);
-  border-color: rgba(255, 255, 255, 0.18);
-  box-shadow: 0 24px 70px rgba(3, 7, 20, 0.35);
-}
-
-.messages {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1 1 auto;
-  width: 100%;
-  min-width: 0;
-  min-height: 0;
-  padding: 2px 2px 10px;
-  overflow: auto;
-  scrollbar-width: thin;
-}
-
-.bubble {
-  max-width: 82%;
-  width: fit-content;
-  padding: 10px 14px;
-  border-radius: 18px;
-  font-weight: 800;
-  line-height: 1.45;
-  animation: bubbleIn 240ms ease both;
-}
-
-.bubble.puppet {
-  border-bottom-left-radius: 7px;
-  color: var(--ink);
-  background: var(--bubble);
-}
-
-.app[data-period="night"] .bubble.puppet {
-  color: #14201d;
-}
-
-.bubble.user {
-  align-self: flex-end;
-  border-bottom-right-radius: 7px;
-  color: #fff;
-  background: var(--user);
-}
-
-.quickReplies {
-  flex: 0 0 auto;
-  display: flex;
-  gap: 8px;
-  width: 100%;
-  min-width: 0;
-  padding: 3px 2px 12px;
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-
-.quickReplies button {
-  flex: 0 0 auto;
-  min-height: 38px;
-  padding: 0 13px;
-  border-radius: 999px;
-  color: var(--accent-dark);
-  background: rgba(255, 255, 255, 0.72);
-  font-weight: 900;
-  white-space: nowrap;
-  transition:
-    transform 180ms ease,
-    background 180ms ease,
-    color 180ms ease;
-}
-
-.quickReplies button:hover,
-.quickReplies button:focus-visible {
-  color: #fff;
-  background: var(--accent);
-  transform: translateY(-1px);
-  outline: none;
-}
-
-.composer {
-  flex: 0 0 auto;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 8px;
-  align-items: center;
-  width: 100%;
-  min-width: 0;
-}
-
-.clipButton,
-.sendButton {
-  display: inline-grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  background: var(--panel-strong);
-  color: var(--accent-dark);
-  transition:
-    transform 180ms ease,
-    background 180ms ease,
-    color 180ms ease;
-}
-
-.clipButton {
-  position: relative;
-  grid-template-columns: 1fr;
-  overflow: hidden;
-  cursor: pointer;
-}
-
-.clipButton span {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-}
-
-.clipButton input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.clipButton svg,
-.sendButton svg {
-  width: 22px;
-  height: 22px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  pointer-events: none;
-}
-
-.clipButton:hover,
-.clipButton:focus-within,
-.sendButton:hover,
-.sendButton:focus-visible {
-  color: #fff;
-  background: var(--accent);
-  transform: translateY(-1px);
-  outline: none;
-}
-
-.composer input[type="text"] {
-  min-width: 0;
-  height: 46px;
-  border: 1px solid rgba(21, 33, 29, 0.1);
-  border-radius: 999px;
-  padding: 0 16px;
-  color: var(--ink);
-  background: var(--panel-strong);
-  outline: none;
-  transition:
-    border-color 180ms ease,
-    box-shadow 180ms ease;
-}
-
-.composer input[type="text"]:focus {
-  border-color: color-mix(in srgb, var(--accent) 54%, transparent);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent);
-}
-
-.composer input::placeholder {
-  color: rgba(21, 33, 29, 0.46);
-}
-
-@keyframes puppetFloat {
-  0%,
-  100% {
-    transform: translateY(0) rotate(-0.8deg);
-  }
-  50% {
-    transform: translateY(-10px) rotate(0.8deg);
-  }
-}
-
-@keyframes talkBounce {
-  0%,
-  100% {
-    scale: 1;
-  }
-  50% {
-    scale: 1.025 0.985;
-  }
-}
-
-@keyframes mouthTalk {
-  0%,
-  100% {
-    transform: translateX(-50%) scaleY(0.62);
-  }
-  50% {
-    transform: translateX(-50%) scaleY(1.18);
-  }
-}
-
-@keyframes shadowPulse {
-  0%,
-  100% {
-    transform: scaleX(1);
-    opacity: 0.7;
-  }
-  50% {
-    transform: scaleX(0.86);
-    opacity: 0.5;
-  }
-}
-
-@keyframes stickerPop {
-  0% {
-    opacity: 0;
-    transform: translateY(14px) scale(0.86) rotate(-2deg);
-  }
-  55% {
-    opacity: 1;
-    transform: translateY(-8px) scale(1.08) rotate(1deg);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1) rotate(0);
-  }
-}
-
-@keyframes bubbleIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 @media (max-width: 680px) {
   body {
     overflow: auto;
-  }
-
-  .stage {
-    height: 100svh;
-    min-height: 100svh;
-    padding: 16px;
-  }
-
-  .puppetWrap {
-    width: min(37svh, 84vw);
-  }
-
-  .talkPanel {
-    height: min(32svh, 232px);
-    min-height: 182px;
-    border-radius: 22px;
-    padding: 12px;
-  }
-
-  .bubble {
-    max-width: 92%;
-    font-size: 0.98rem;
-  }
-
-  .quickReplies button {
-    min-height: 36px;
-    padding: 0 11px;
-    font-size: 0.88rem;
   }
 }
 
@@ -557,5 +47,80 @@ button {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes puppetFloat {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-0.8deg);
+  }
+
+  50% {
+    transform: translateY(-10px) rotate(0.8deg);
+  }
+}
+
+@keyframes talkBounce {
+  0%,
+  100% {
+    scale: 1;
+  }
+
+  50% {
+    scale: 1.025 0.985;
+  }
+}
+
+@keyframes mouthTalk {
+  0%,
+  100% {
+    transform: translateX(-50%) scaleY(0.62);
+  }
+
+  50% {
+    transform: translateX(-50%) scaleY(1.18);
+  }
+}
+
+@keyframes shadowPulse {
+  0%,
+  100% {
+    transform: scaleX(1);
+    opacity: 0.7;
+  }
+
+  50% {
+    transform: scaleX(0.86);
+    opacity: 0.5;
+  }
+}
+
+@keyframes stickerPop {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.86) rotate(-2deg);
+  }
+
+  55% {
+    opacity: 1;
+    transform: translateY(-8px) scale(1.08) rotate(1deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0);
+  }
+}
+
+@keyframes bubbleIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
