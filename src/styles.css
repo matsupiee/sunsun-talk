@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root {
   color-scheme: light;
   --ink: #15211d;
@@ -54,7 +56,7 @@ button {
   --accent: #e8783f;
   --accent-dark: #b84f29;
   --user: #d46035;
-  --bg-image: url("./assets/backgrounds/morning.png");
+  --bg-image: url("/assets/backgrounds/morning.png");
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 252, 235, 0.32)),
     var(--bg-image),
@@ -65,7 +67,7 @@ button {
   --accent: #1d8f72;
   --accent-dark: #0f5f4b;
   --user: #1d8f72;
-  --bg-image: url("./assets/backgrounds/day.jpg");
+  --bg-image: url("/assets/backgrounds/day.jpg");
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(234, 255, 249, 0.28)),
     var(--bg-image),
@@ -76,7 +78,7 @@ button {
   --accent: #bd5d80;
   --accent-dark: #87405a;
   --user: #a44e70;
-  --bg-image: url("./assets/backgrounds/evening.png");
+  --bg-image: url("/assets/backgrounds/evening.png");
   background:
     linear-gradient(180deg, rgba(255, 247, 230, 0.02), rgba(70, 30, 44, 0.16)),
     var(--bg-image),
@@ -87,7 +89,7 @@ button {
   --accent: #557bd7;
   --accent-dark: #304e98;
   --user: #4a66bd;
-  --bg-image: url("./assets/backgrounds/night.jpg");
+  --bg-image: url("/assets/backgrounds/night.jpg");
   background:
     linear-gradient(180deg, rgba(16, 25, 58, 0.08), rgba(8, 15, 42, 0.38)),
     var(--bg-image),
