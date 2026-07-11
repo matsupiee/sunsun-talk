@@ -431,32 +431,10 @@ export function TalkPage() {
             </button>
           </div>
 
-          {/* speaking rings */}
-          {speaking && (
-            <div
-              aria-hidden="true"
-              className="absolute left-1/2 top-[40%] z-[2] -ml-[28px] h-[56px] w-[56px]"
-            >
-              <span
-                className="absolute inset-0 rounded-full border-[3px] border-white"
-                style={{ animation: "ring 1.3s ease-out infinite" }}
-              />
-              <span
-                className="absolute inset-0 rounded-full border-[3px] border-white"
-                style={{ animation: "ring 1.3s ease-out infinite .65s" }}
-              />
-            </div>
-          )}
-
           {/* character */}
           <div className="absolute inset-x-0 bottom-0 z-[1] grid h-[92%] place-items-end justify-items-center">
             <div
               className="grid aspect-square h-full max-w-[96%] place-items-center [transform-origin:50%_100%]"
-              style={{
-                animation: speaking
-                  ? "suntalk .52s ease-in-out infinite"
-                  : "puppetFloat 3.6s ease-in-out infinite",
-              }}
             >
               <img
                 ref={stickerRef}
@@ -555,7 +533,8 @@ export function TalkPage() {
           </div>
 
           {/* caption bubble (スンスンのお返事) */}
-          <div className="absolute inset-x-[16px] bottom-[16px] z-[8]">
+          {/*一旦コメントアウト*/}
+          {/*<div className="absolute inset-x-[16px] bottom-[16px] z-[8]">
             <div
               className="absolute -bottom-[8px] left-[42px] h-[18px] w-[18px] rotate-45"
               style={{ background: "#fff", borderRight: `3px solid ${INK}`, borderBottom: `3px solid ${INK}` }}
@@ -582,7 +561,7 @@ export function TalkPage() {
                 {caption}
               </div>
             </div>
-          </div>
+          </div>*/}
         </div>
 
         <audio ref={stickerSoundRef} id="stickerSound" preload="auto" />
