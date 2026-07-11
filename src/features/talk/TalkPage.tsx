@@ -10,8 +10,9 @@ import {
   buildStickers,
   getPeriod,
   normalize,
-  remoteReplyFor,
+  remoteTalkFor,
   type Sticker,
+  type TalkHistoryMessage,
 } from "./talk";
 
 type Sender = "user" | "puppet";
@@ -147,6 +148,8 @@ export function TalkPage() {
   const [stickerAnimationKey, setStickerAnimationKey] = useState(0);
   const [isStickerTalking, setIsStickerTalking] = useState(false);
   const [isFallbackTalking, setIsFallbackTalking] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<"ready" | "thinking" | "speaking">("ready");
 
   const messageId = useRef(1);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -154,6 +157,7 @@ export function TalkPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const stickerRef = useRef<HTMLImageElement>(null);
   const stickerSoundRef = useRef<HTMLAudioElement>(null);
+  const generatedVoiceRef = useRef<HTMLAudioElement>(null);
 
   const clips = useRef<Clip[]>([]);
   const stickers = useRef<Sticker[]>(buildStickers(STICKER_IDS));
@@ -187,6 +191,13 @@ export function TalkPage() {
 
   function appendMessage(text: string, sender: Sender) {
     setMessages((prev) => [...prev, { id: messageId.current++, text, sender }]);
+  }
+
+  function historyForApi(): TalkHistoryMessage[] {
+    return messages.slice(-10).map<TalkHistoryMessage>((message) => ({
+      role: message.sender === "puppet" ? "assistant" : "user",
+      content: message.text,
+    }));
   }
 
   function randomSticker(): Sticker | null {
@@ -253,6 +264,35 @@ export function TalkPage() {
     }
   }
 
+  async function playGeneratedVoice(audioUrl: string) {
+    const audio = generatedVoiceRef.current;
+    const stickerSound = stickerSoundRef.current;
+    const video = videoRef.current;
+
+    if (!audio) return false;
+
+    video?.pause();
+    stickerSound?.pause();
+    window.clearTimeout(chainTimer.current);
+
+    setPuppetMode("sticker");
+    setIsStickerTalking(true);
+    setVoiceStatus("speaking");
+
+    audio.pause();
+    audio.src = audioUrl;
+    audio.currentTime = 0;
+
+    try {
+      await audio.play();
+      return true;
+    } catch {
+      setVoiceStatus("ready");
+      setIsStickerTalking(false);
+      return false;
+    }
+  }
+
   function pickClipIndex(): number {
     if (clips.current.length <= 1) return 0;
 
@@ -311,17 +351,31 @@ export function TalkPage() {
 
   function handleSay(rawText: string) {
     const text = rawText.trim();
-    if (!text) return;
+    if (!text || isGenerating) return;
 
     appendMessage(text, "user");
+    setIsGenerating(true);
+    setVoiceStatus("thinking");
+    const history = historyForApi();
 
     window.setTimeout(async () => {
-      const response = await remoteReplyFor(text);
-      appendMessage(response, "puppet");
-      if (clips.current.length) {
-        playRandomClip();
-      } else {
-        playSticker(stickerForInput(text));
+      try {
+        const response = await remoteTalkFor(text, history);
+        appendMessage(response.reply, "puppet");
+
+        if (response.audioUrl) {
+          playSticker(stickerForInput(text), { sound: false });
+          const played = await playGeneratedVoice(response.audioUrl);
+          if (!played) playSticker(stickerForInput(text));
+        } else if (clips.current.length) {
+          setVoiceStatus("ready");
+          playRandomClip();
+        } else {
+          setVoiceStatus("ready");
+          playSticker(stickerForInput(text));
+        }
+      } finally {
+        setIsGenerating(false);
       }
     }, 220);
   }
@@ -445,10 +499,10 @@ export function TalkPage() {
             ref={stickerRef}
             key={stickerAnimationKey}
             className={cn(
-              "hidden w-[min(100%,390px)] max-h-full object-contain",
+              "w-[min(100%,390px)] max-h-full object-contain",
               "[filter:drop-shadow(0_34px_34px_rgba(24,53,45,0.26))]",
               "[transform-origin:50%_82%] select-none [-webkit-user-drag:none]",
-              isStickerMode && "block",
+              isStickerMode ? "block" : "hidden",
             )}
             src={stickerSrc}
             alt="パペットステッカー"
@@ -471,11 +525,10 @@ export function TalkPage() {
             ref={videoRef}
             id="puppetVideo"
             className={cn(
-              "hidden w-full h-full object-cover",
+              "w-full h-full object-cover",
               "[border-radius:44%_44%_38%_38%] [filter:drop-shadow(0_38px_44px_rgba(24,53,45,0.26))]",
               "[transform-origin:50%_80%]",
-              isVideoMode &&
-                "block animate-[puppetFloat_2.4s_ease-in-out_infinite]",
+              isVideoMode ? "block animate-[puppetFloat_2.4s_ease-in-out_infinite]" : "hidden",
             )}
             muted
             playsInline
@@ -491,7 +544,7 @@ export function TalkPage() {
           />
 
           <div
-            className={cn("absolute inset-0 hidden place-items-center", puppetMode === "fallback" && "grid")}
+            className={cn("absolute inset-0 place-items-center", puppetMode === "fallback" ? "grid" : "hidden")}
             aria-hidden="true"
           >
             <div
@@ -541,6 +594,19 @@ export function TalkPage() {
           </div>
         </div>
         <audio ref={stickerSoundRef} id="stickerSound" preload="auto" />
+        <audio
+          ref={generatedVoiceRef}
+          id="generatedVoice"
+          preload="auto"
+          onEnded={() => {
+            setVoiceStatus("ready");
+            setIsStickerTalking(false);
+          }}
+          onError={() => {
+            setVoiceStatus("ready");
+            setIsStickerTalking(false);
+          }}
+        />
 
         <section
           className={cn(
@@ -574,6 +640,17 @@ export function TalkPage() {
                 {message.text}
               </div>
             ))}
+            {isGenerating && (
+              <div
+                className={cn(
+                  "w-fit max-w-[82%] rounded-[18px] rounded-bl-[7px] px-[14px] py-[10px]",
+                  "font-black leading-[1.45] text-[var(--bubble-fg)] bg-[var(--bubble)] opacity-80",
+                  "animate-[bubbleIn_240ms_ease_both]",
+                )}
+              >
+                考え中...
+              </div>
+            )}
           </div>
 
           <div
@@ -588,11 +665,13 @@ export function TalkPage() {
                 key={label}
                 type="button"
                 onClick={() => handleSay(label)}
+                disabled={isGenerating}
                 className={cn(
                   "inline-flex items-center justify-center min-h-[38px] px-[13px] rounded-full whitespace-nowrap",
                   "font-black text-[var(--accent-dark)] bg-[rgba(255,255,255,0.72)] transition-[transform,background,color] duration-180",
                   "hover:bg-[var(--accent)] hover:text-white focus-visible:bg-[var(--accent)] focus-visible:text-white focus-visible:outline-none",
                   "hover:-translate-y-px focus-visible:-translate-y-px",
+                  "disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:translate-y-0 disabled:hover:bg-[rgba(255,255,255,0.72)] disabled:hover:text-[var(--accent-dark)]",
                   "max-[680px]:min-h-[36px] max-[680px]:px-[11px] max-[680px]:text-[0.88rem]",
                 )}
               >
@@ -636,12 +715,14 @@ export function TalkPage() {
               autoComplete="off"
               placeholder="話しかける"
               aria-label="話しかける"
+              disabled={isGenerating}
               className={cn(
                 "min-w-0 h-[46px] border border-[rgba(21,33,29,0.1)] rounded-full px-[16px] text-[var(--ink)] bg-[var(--panel-strong)]",
                 "outline-none transition-[border-color,box-shadow] duration-180",
                 "focus:border-[var(--accent)] focus-visible:outline-none",
                 "focus-visible:[box-shadow:0_0_0_4px_var(--focus-ring)]",
                 "placeholder:text-[var(--muted)]",
+                "disabled:opacity-70",
               )}
             />
             <button
@@ -652,6 +733,7 @@ export function TalkPage() {
                 "focus-visible:bg-[var(--accent)] focus-visible:text-white focus-visible:outline-none focus-visible:-translate-y-px",
               )}
               type="submit"
+              disabled={isGenerating}
               title="送信"
               aria-label="送信"
             >
@@ -664,6 +746,13 @@ export function TalkPage() {
               </svg>
             </button>
           </form>
+          <div
+            className="mt-[8px] min-h-[18px] px-[4px] text-[0.78rem] font-black text-[var(--muted)]"
+            aria-live="polite"
+          >
+            {voiceStatus === "thinking" && "返答を生成中"}
+            {voiceStatus === "speaking" && "音声を再生中"}
+          </div>
         </section>
       </section>
     </main>

@@ -6,6 +6,17 @@ export interface Sticker {
   sound: string;
 }
 
+export interface TalkHistoryMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface TalkResponse {
+  reply: string;
+  audioUrl: string | null;
+  mode: "openai" | "fallback";
+}
+
 export function getPeriod(date = new Date()): Period {
   const hour = date.getHours();
   return (
@@ -60,4 +71,39 @@ export async function remoteReplyFor(text: string): Promise<string> {
   }
 
   return replyFor(text);
+}
+
+export async function remoteTalkFor(
+  text: string,
+  history: TalkHistoryMessage[] = [],
+): Promise<TalkResponse> {
+  try {
+    const response = await fetch("/api/talk", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text, history }),
+    });
+    if (!response.ok) throw new Error("Talk API unavailable");
+
+    const data = (await response.json()) as {
+      reply?: unknown;
+      audioUrl?: unknown;
+      mode?: unknown;
+    };
+    if (typeof data.reply === "string") {
+      return {
+        reply: data.reply,
+        audioUrl: typeof data.audioUrl === "string" ? data.audioUrl : null,
+        mode: data.mode === "openai" ? "openai" : "fallback",
+      };
+    }
+  } catch {
+    // The Vite-only dev server has no Worker API, so keep local prototyping instant.
+  }
+
+  return {
+    reply: replyFor(text),
+    audioUrl: null,
+    mode: "fallback",
+  };
 }
