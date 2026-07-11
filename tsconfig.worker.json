@@ -9,5 +9,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["src/index.ts"]
+  "include": ["src/server", "src/api-contracts"]
 }

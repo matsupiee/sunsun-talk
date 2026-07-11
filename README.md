@@ -18,20 +18,25 @@ Vite + React + TanStack Router + Tailwind CSS で構成し、API とデプロイ
 
 - **Vite** — 開発サーバーと本番ビルド（出力先は `dist/`）
 - **React 19** — UI
-- **TanStack Router** — ルーティング（`src/router.tsx`）
-- **Tailwind CSS v4** — `@tailwindcss/vite` プラグイン（`src/styles.css` で `@import "tailwindcss"`）
-- **Hono on Cloudflare Workers** — `GET /api/health`、`POST /api/reply`、`POST /api/talk`（`src/index.ts`）
+- **TanStack Router** — ルーティング（`src/client/router.tsx`）
+- **Tailwind CSS v4** — `@tailwindcss/vite` プラグイン（`src/client/styles.css` で `@import "tailwindcss"`）
+- **Hono on Cloudflare Workers** — `GET /api/health`、`POST /api/reply`、`POST /api/talk`（`src/server/index.ts`）
 
 ### ディレクトリ
 
 ```
 index.html            Vite のエントリ
 public/assets/        ステッカー・背景・動画などの静的素材
-src/main.tsx          React エントリ
-src/router.tsx        TanStack Router
-src/styles.css        Tailwind + 画面デザイン
-src/features/talk/    会話画面のコンポーネントとロジック
-src/index.ts          Cloudflare Worker（Hono API）
+src/client/main.tsx                 React エントリ
+src/client/router.tsx               TanStack Router
+src/client/styles.css               Tailwind + 画面デザイン
+src/client/features/talk/page.tsx   会話画面
+src/client/features/talk/_utils/    会話画面のブラウザ側ロジック
+src/server/index.ts                 Cloudflare Worker（Hono API）
+src/server/routes/                  Worker の API routes
+src/server/services/openai/         OpenAI API 呼び出し
+src/server/domain/                  サーバー側ドメインロジック
+src/api-contracts/talk.ts           フロントエンド/バックエンド間のAPI契約
 ```
 
 ## 開発

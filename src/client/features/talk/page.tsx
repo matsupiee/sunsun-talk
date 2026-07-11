@@ -5,15 +5,12 @@ import {
   STICKER_BASE,
   STICKER_IDS,
   type PeriodKey,
-} from "./constants";
-import {
-  buildStickers,
-  getPeriod,
-  normalize,
-  remoteTalkFor,
-  type Sticker,
-  type TalkHistoryMessage,
-} from "./talk";
+} from "./_utils/constants";
+import { normalize } from "./_utils/localFallback";
+import { getPeriod } from "./_utils/period";
+import { buildStickers, type Sticker } from "./_utils/stickers";
+import { remoteTalkFor } from "./_utils/talkApi";
+import type { TalkHistoryMessage } from "../../../api-contracts/talk";
 
 type Sender = "user" | "puppet";
 type PuppetMode = "sticker" | "video" | "fallback";
