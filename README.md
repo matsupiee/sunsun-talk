@@ -2,6 +2,8 @@
 
 固定応答とローカル動画クリップのランダム再生だけに絞った、個人用の会話プロトタイプです。
 
+Vite + React + TanStack Router + Tailwind CSS で構成し、API とデプロイは Cloudflare Workers（Hono）を使います。
+
 ## できること
 
 - `おはよう` -> `おはよう！`
@@ -13,24 +15,53 @@
 - ステッカーに対応する `m4a` 音声を再生
 - ローカル動画を選ぶと、会話のたびにランダムなクリップを再生
 
-## 起動
+## 技術構成
 
-```bash
-python3 -m http.server 4173
+- **Vite** — 開発サーバーと本番ビルド（出力先は `dist/`）
+- **React 19** — UI
+- **TanStack Router** — ルーティング（`src/router.tsx`）
+- **Tailwind CSS v4** — `@tailwindcss/vite` プラグイン（`src/styles.css` で `@import "tailwindcss"`）
+- **Hono on Cloudflare Workers** — `GET /api/health` と `POST /api/reply`（`src/index.ts`）
+
+### ディレクトリ
+
+```
+index.html            Vite のエントリ
+public/assets/        ステッカー・背景・動画などの静的素材
+src/main.tsx          React エントリ
+src/router.tsx        TanStack Router
+src/styles.css        Tailwind + 画面デザイン
+src/features/talk/    会話画面のコンポーネントとロジック
+src/index.ts          Cloudflare Worker（Hono API）
 ```
 
-ブラウザで `http://localhost:4173` を開きます。
-
-## Cloudflare Worker + Hono
-
-Cloudflare Workersにデプロイする場合は、Hono Workerと静的アセット配信を使います。
+## 開発
 
 ```bash
 npm install
 npm run dev
 ```
 
-ローカルのWorker開発サーバーで確認後、Cloudflareにログインしてデプロイします。
+ブラウザで表示された URL（既定は `http://localhost:5173`）を開きます。`npm run dev` はフロントエンドのみを起動し、API が無い場合はローカルの固定応答にフォールバックするのでそのまま会話できます。
+
+型チェックとビルド:
+
+```bash
+npm run typecheck
+npm run build
+```
+
+## Cloudflare Worker + Hono
+
+Worker と静的アセットの両方を含めてローカル確認したい場合は、ビルドしてから `wrangler dev` を実行します。
+
+```bash
+npm run cf:dev
+```
+
+Worker 側には `GET /api/health` と `POST /api/reply` を用意しています。画面は Vite が `dist/` に出力した静的ファイルを Cloudflare Workers Assets で配信し、`/api/*` のみ Worker が処理します。
+
+デプロイ:
 
 ```bash
 npm run cf:whoami
@@ -43,18 +74,16 @@ npm run deploy
 npx wrangler login
 ```
 
-Worker側には `GET /api/health` と `POST /api/reply` を用意しています。画面自体は `dist/` にコピーした静的ファイルをCloudflare Workers Assetsで配信します。
-
 ## 動画クリップ
 
-画面左下の `+` ボタンから手元の動画を複数選べます。動画を選ぶと、ステッカー表示より動画再生が優先されます。毎回選ぶのが面倒な場合は、動画を `assets/clips/` に置いて `assets/clips/manifest.json` に追記してください。
+画面左下の `+` ボタンから手元の動画を複数選べます。動画を選ぶと、ステッカー表示より動画再生が優先されます。毎回選ぶのが面倒な場合は、動画を `public/assets/clips/` に置いて `public/assets/clips/manifest.json` に追記してください。
 
 ```json
 {
   "clips": [
     {
       "name": "sample-1",
-      "src": "./assets/clips/sample-1.mp4"
+      "src": "/assets/clips/sample-1.mp4"
     }
   ]
 }
