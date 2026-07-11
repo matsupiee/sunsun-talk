@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>おしゃべりMVP</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='28' fill='%23e8fff4'/%3E%3Ccircle cx='24' cy='29' r='4' fill='%2315211d'/%3E%3Ccircle cx='40' cy='29' r='4' fill='%2315211d'/%3E%3Cpath d='M25 41c4 4 10 4 14 0' stroke='%2315211d' stroke-width='4' stroke-linecap='round' fill='none'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app" data-period="day">
+      <section class="stage" aria-label="おしゃべりステージ">
+        <div class="backdrop" aria-hidden="true"></div>
+
+        <header class="topbar">
+          <h1 class="brandTitle">PUPPET TALK</h1>
+        </header>
+
+        <div class="puppetWrap" aria-live="polite">
+          <img
+            id="stickerPuppet"
+            class="stickerPuppet is-active"
+            src="./assets/stickerpack@2x/animation@2x/593654934@2x.png"
+            alt="パペットステッカー"
+          />
+
+          <video
+            id="puppetVideo"
+            class="puppetVideo"
+            muted
+            playsinline
+            preload="metadata"
+            aria-label="パペット動画"
+          ></video>
+
+          <div id="fallbackPuppet" class="fallbackPuppet" aria-hidden="true">
+            <div class="puppetBody">
+              <span class="eye eyeLeft"></span>
+              <span class="eye eyeRight"></span>
+              <span class="mouth"></span>
+            </div>
+            <div class="shadow"></div>
+          </div>
+        </div>
+        <audio id="stickerSound" preload="auto"></audio>
+
+        <section class="talkPanel" aria-label="会話">
+          <div id="messages" class="messages">
+            <div class="bubble puppet">こんにちは！</div>
+          </div>
+
+          <div class="quickReplies" aria-label="入力候補">
+            <button type="button" data-say="おはよう">おはよう</button>
+            <button type="button" data-say="こんにちは">こんにちは</button>
+            <button type="button" data-say="ありがとう">ありがとう</button>
+            <button type="button" data-say="今日こんなことがあってね">今日こんなことがあってね</button>
+          </div>
+
+          <form id="chatForm" class="composer">
+            <label class="clipButton" title="ローカル動画を追加">
+              <input id="clipPicker" type="file" accept="video/mp4,video/webm,video/quicktime" multiple />
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              <span>clips</span>
+            </label>
+            <input
+              id="chatInput"
+              type="text"
+              autocomplete="off"
+              placeholder="話しかける"
+              aria-label="話しかける"
+            />
+            <button class="sendButton" type="submit" title="送信" aria-label="送信">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m5 12 14-7-4 14-3-6-7-1Z" />
+              </svg>
+            </button>
+          </form>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

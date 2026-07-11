@@ -1,0 +1,23 @@
+{
+  "name": "sunsun-talk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-static.mjs",
+    "dev": "wrangler dev",
+    "predev": "npm run build",
+    "deploy": "wrangler deploy",
+    "predeploy": "npm run build",
+    "cf:whoami": "wrangler whoami",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.6.20"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "latest",
+    "typescript": "^5.7.3",
+    "wrangler": "^4.0.0"
+  }
+}

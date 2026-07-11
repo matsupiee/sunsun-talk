@@ -1,0 +1,17 @@
+- main [ref=f6e2]:
+  - region "おしゃべりステージ" [ref=f6e3]:
+    - heading "PUPPET TALK" [level=1] [ref=f6e5]
+    - img "パペットステッカー" [ref=f6e7]
+    - region "会話" [ref=f6e8]:
+      - generic [ref=f6e9]: こんにちは！
+      - generic "入力候補" [ref=f6e11]:
+        - button "おはよう" [ref=f6e12] [cursor=pointer]
+        - button "こんにちは" [ref=f6e13] [cursor=pointer]
+        - button "ありがとう" [ref=f6e14] [cursor=pointer]
+        - button "今日こんなことがあってね" [ref=f6e15] [cursor=pointer]
+      - generic [ref=f6e16]:
+        - generic "ローカル動画を追加" [ref=f6e17] [cursor=pointer]:
+          - button "clips" [ref=f6e18]
+          - generic [ref=f6e19]: clips
+        - textbox "話しかける" [ref=f6e20]
+        - button "送信" [ref=f6e21] [cursor=pointer]
