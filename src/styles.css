@@ -130,26 +130,6 @@ button {
     radial-gradient(circle at 50% 108%, rgba(255, 255, 255, 0.2), transparent 22rem);
 }
 
-.topbar {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  width: 100%;
-  max-width: 1040px;
-  min-width: 0;
-  margin: 0 auto;
-}
-
-.brandTitle {
-  margin: 0;
-  color: currentColor;
-  font-size: clamp(2.6rem, 8vw, 6.4rem);
-  font-weight: 950;
-  line-height: 0.82;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
 .puppetWrap {
   position: relative;
   align-self: center;
@@ -544,10 +524,6 @@ button {
     height: 100svh;
     min-height: 100svh;
     padding: 16px;
-  }
-
-  .topbar {
-    align-items: center;
   }
 
   .puppetWrap {
