@@ -274,8 +274,14 @@ export function TalkPage() {
       <section className="stage" aria-label="おしゃべりステージ">
         <div className="backdrop" aria-hidden="true" />
 
-        <header className="topbar">
-          <h1 className="brandTitle">PUPPET TALK</h1>
+        <header className="mx-auto flex w-full max-w-[1040px] min-w-0 items-start justify-start max-[680px]:items-center">
+          <h1 className="m-0 leading-[0]">
+            <img
+              className="block h-auto w-[clamp(110px,21vw,260px)] max-w-full select-none object-contain mix-blend-screen [-webkit-user-drag:none]"
+              src="/assets/header_logo.png"
+              alt="PUPPET TALK"
+            />
+          </h1>
         </header>
 
         <div className="puppetWrap" aria-live="polite">
