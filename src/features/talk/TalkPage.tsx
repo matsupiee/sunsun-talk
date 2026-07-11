@@ -344,8 +344,7 @@ export function TalkPage() {
     <main
       className={cn(
         "relative flex min-h-[100svh] w-full flex-col items-center",
-        "px-[clamp(14px,4vw,40px)] pt-[clamp(18px,3.4vh,42px)] pb-[clamp(18px,3.4vh,52px)]",
-        "max-[680px]:px-0 max-[680px]:pt-[10px] max-[680px]:pb-0",
+        "px-0 pt-[10px] pb-0",
       )}
       style={{ background: PAGE_BG, color: INK }}
       data-period={period}
@@ -369,12 +368,10 @@ export function TalkPage() {
         </h1>
       </header>
 
-      {/* ============ PHONE FRAME ============ */}
+      {/* ============ APP VIEWPORT ============ */}
       <section
         className={cn(
-          "relative z-[1] flex w-[min(420px,94vw)] min-h-0 max-h-[812px] flex-1 flex-col overflow-hidden",
-          "rounded-[46px] border-4 border-[#16130E] shadow-[0_22px_50px_-12px_rgba(0,0,0,0.4)]",
-          "max-[680px]:w-full max-[680px]:max-h-none max-[680px]:rounded-none max-[680px]:border-0 max-[680px]:shadow-none",
+          "relative z-[1] flex min-h-0 w-full max-w-[640px] flex-1 flex-col overflow-hidden",
         )}
         style={{ background: PANEL_BG }}
         aria-label="おしゃべりステージ"
