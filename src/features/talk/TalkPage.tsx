@@ -359,12 +359,6 @@ export function TalkPage() {
 
       {/* title lockup — the header logo stays as the wordmark */}
       <header className="relative z-[1] mb-[clamp(12px,2.2vh,22px)] shrink-0 text-center max-[680px]:mb-[8px]">
-        <div
-          className="mb-[6px] pl-[0.4em] text-[12px] font-semibold tracking-[0.4em] max-[680px]:hidden"
-          style={{ fontFamily: "'Zilla Slab', serif", color: INK }}
-        >
-          PUPPET SUNSUN
-        </div>
         <h1 className="m-0 leading-[0]">
           <img
             className="mx-auto block h-auto w-[clamp(150px,42vw,280px)] max-w-full select-none object-contain [-webkit-user-drag:none] max-[680px]:w-[168px]"
@@ -373,12 +367,6 @@ export function TalkPage() {
             style={{ filter: "brightness(0)" }}
           />
         </h1>
-        <p
-          className="mx-auto mt-[8px] mb-0 max-w-[340px] text-[13px] font-medium max-[680px]:hidden"
-          style={{ color: "#8a7648" }}
-        >
-          文字で話しかけると、スンスンが動いてお返事するよ♪
-        </p>
       </header>
 
       {/* ============ PHONE FRAME ============ */}
@@ -640,35 +628,6 @@ export function TalkPage() {
             className="flex shrink-0 items-center gap-[10px] px-[16px] pt-[8px] pb-[18px]"
             onSubmit={handleSubmit}
           >
-            <label
-              className="relative grid h-[52px] w-[52px] shrink-0 cursor-pointer place-items-center overflow-hidden rounded-full transition-transform duration-150 hover:-translate-y-px active:translate-y-px"
-              style={{
-                background: "#FFFDF7",
-                border: `2.5px solid ${INK}`,
-                boxShadow: "0 3px 0 rgba(22,19,14,.2)",
-                color: INK,
-              }}
-              title="ローカル動画を追加"
-            >
-              <input
-                type="file"
-                accept="video/mp4,video/webm,video/quicktime"
-                multiple
-                className="absolute inset-0 cursor-pointer opacity-0"
-                onChange={(event) => {
-                  addPickedClips(event.target.files);
-                  event.target.value = "";
-                }}
-              />
-              <svg
-                className="pointer-events-none h-[22px] w-[22px] fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2.6]"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              <span className="absolute h-px w-px overflow-hidden [clip:rect(0,0,0,0)]">clips</span>
-            </label>
             <input
               ref={inputRef}
               type="text"
