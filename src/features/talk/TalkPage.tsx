@@ -357,10 +357,10 @@ export function TalkPage() {
       />
 
       {/* title lockup — the header logo stays as the wordmark */}
-      <header className="relative z-[1] mb-[clamp(12px,2.2vh,22px)] shrink-0 text-center max-[680px]:mb-[8px]">
+      <header className="relative z-[1] mb-[clamp(6px,1vh,10px)] shrink-0 text-center max-[680px]:mb-[8px]">
         <h1 className="m-0 leading-[0]">
           <img
-            className="mx-auto block h-auto w-[clamp(150px,42vw,280px)] max-w-full select-none object-contain [-webkit-user-drag:none] max-[680px]:w-[168px]"
+            className="mx-auto block h-auto w-[clamp(150px,28vw,200px)] max-w-full select-none object-contain [-webkit-user-drag:none] max-[680px]:w-[168px]"
             src="/assets/header_logo.png"
             alt="PUPPET TALK"
             style={{ filter: "brightness(0)" }}
@@ -371,7 +371,7 @@ export function TalkPage() {
       {/* ============ APP VIEWPORT ============ */}
       <section
         className={cn(
-          "relative z-[1] flex min-h-0 w-full max-w-[640px] flex-1 flex-col overflow-hidden",
+          "relative z-[1] flex min-h-0 w-full max-w-[480px] flex-1 flex-col overflow-hidden",
         )}
         style={{ background: PANEL_BG }}
         aria-label="おしゃべりステージ"
