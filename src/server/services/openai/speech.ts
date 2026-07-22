@@ -8,7 +8,10 @@ export interface GeneratedSpeech {
   dataUrl: string;
 }
 
-export async function generateSpeech(env: Env, text: string): Promise<GeneratedSpeech | null> {
+export async function generateSpeech(
+  env: Env,
+  text: string,
+): Promise<GeneratedSpeech | null> {
   if (!env.OPENAI_API_KEY) return null;
 
   const response = await fetch(`${OPENAI_BASE_URL}/audio/speech`, {
@@ -19,7 +22,7 @@ export async function generateSpeech(env: Env, text: string): Promise<GeneratedS
     },
     body: JSON.stringify({
       model: env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts",
-      voice: env.OPENAI_TTS_VOICE || "alloy",
+      voice: env.OPENAI_TTS_VOICE || "coral",
       input: text,
       response_format: "mp3",
       instructions: VOICE_INSTRUCTIONS,
@@ -28,7 +31,9 @@ export async function generateSpeech(env: Env, text: string): Promise<GeneratedS
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
-    throw new Error(`OpenAI speech failed: ${response.status} ${detail.slice(0, 240)}`);
+    throw new Error(
+      `OpenAI speech failed: ${response.status} ${detail.slice(0, 240)}`,
+    );
   }
 
   const audio = await response.arrayBuffer();
