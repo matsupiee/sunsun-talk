@@ -80,6 +80,42 @@ button {
   }
 }
 
+@keyframes voiceRing {
+  0% {
+    transform: scale(1);
+    opacity: 0.52;
+  }
+
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+@keyframes equalizer {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes orbWob {
+  0%,
+  100% {
+    border-radius: 48% 52% 55% 45% / 52% 48% 52% 48%;
+    transform: rotate(0deg);
+  }
+
+  50% {
+    border-radius: 55% 45% 48% 52% / 45% 55% 45% 55%;
+    transform: rotate(8deg);
+  }
+}
+
 @keyframes talkBounce {
   0%,
   100% {

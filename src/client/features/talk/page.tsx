@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState, type FormEvent, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
-  QUICK_REPLIES,
   RESPONSE_STICKERS,
   STICKER_BASE,
   STICKER_IDS,
@@ -26,6 +25,49 @@ interface Clip {
   src: string;
 }
 
+interface SpeechRecognitionAlternativeLike {
+  transcript: string;
+}
+
+interface SpeechRecognitionResultLike {
+  isFinal: boolean;
+  [index: number]: SpeechRecognitionAlternativeLike;
+}
+
+interface SpeechRecognitionResultListLike {
+  length: number;
+  [index: number]: SpeechRecognitionResultLike;
+}
+
+interface SpeechRecognitionEventLike extends Event {
+  results: SpeechRecognitionResultListLike;
+}
+
+interface SpeechRecognitionErrorEventLike extends Event {
+  error?: string;
+}
+
+interface SpeechRecognitionLike {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+}
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
+
 function cn(...classes: Array<string | false | undefined | null>) {
   return classes.filter(Boolean).join(" ");
 }
@@ -37,6 +79,7 @@ const PANEL_BG = "#FCF8EE";
 const YELLOW = "#F3B01C";
 const BLUE = "#3E93D0";
 const LISTEN_DOT = "#5BB56A";
+const RED = "#E8503A";
 
 // The paper-grain texture used across the page and the stage.
 const GRAIN =
@@ -50,10 +93,22 @@ const STAGE_BG: Record<PeriodKey, string> = {
   night: "#6E8FCB",
 };
 
-const CHIP_DOTS = ["#E8503A", YELLOW, BLUE, LISTEN_DOT];
-
 const INITIAL_STICKER = `${STICKER_BASE}/animation@2x/${STICKER_IDS[0]}@2x.png`;
 const DEFAULT_CAPTION = "こんにちは！";
+
+const EQ_BARS = [
+  { duration: "0.7s", delay: "0s" },
+  { duration: "0.55s", delay: "0.12s" },
+  { duration: "0.8s", delay: "0.05s" },
+  { duration: "0.5s", delay: "0.2s" },
+  { duration: "0.75s", delay: "0.08s" },
+  { duration: "0.6s", delay: "0.16s" },
+  { duration: "0.85s", delay: "0.02s" },
+  { duration: "0.5s", delay: "0.22s" },
+  { duration: "0.7s", delay: "0.1s" },
+  { duration: "0.6s", delay: "0.18s" },
+  { duration: "0.8s", delay: "0.06s" },
+];
 
 const puppetBodyStyle: CSSProperties = {
   background:
@@ -61,6 +116,49 @@ const puppetBodyStyle: CSSProperties = {
   boxShadow: `inset -22px -22px 44px rgba(22, 19, 14, 0.12), inset 18px 20px 30px rgba(255, 255, 255, 0.72), 0 30px 44px rgba(22, 19, 14, 0.22)`,
   border: `3px solid ${INK}`,
 };
+
+function MicrophoneIcon({ color = INK }: { color?: string }) {
+  return (
+    <svg width="42" height="42" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="9" y="2.75" width="6" height="11.5" rx="3" stroke={color} strokeWidth="2.2" />
+      <path
+        d="M5.4 10.4a6.6 6.6 0 0 0 13.2 0M12 17.2v3.3M8.2 20.5h7.6"
+        stroke={color}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2.2"
+      />
+    </svg>
+  );
+}
+
+function SpeakerIcon({ muted, color = INK }: { muted: boolean; color?: string }) {
+  return (
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M4 9.4v5.2h3.8L13 19V5L7.8 9.4H4Z"
+        stroke={color}
+        strokeLinejoin="round"
+        strokeWidth="2.2"
+      />
+      {muted ? (
+        <path
+          d="m17.2 9.2 3.6 3.6m0-3.6-3.6 3.6"
+          stroke={color}
+          strokeLinecap="round"
+          strokeWidth="2.2"
+        />
+      ) : (
+        <path
+          d="M16.5 8.1a5.1 5.1 0 0 1 0 7.8M18.8 5.8a8.4 8.4 0 0 1 0 12.4"
+          stroke={color}
+          strokeLinecap="round"
+          strokeWidth="2.2"
+        />
+      )}
+    </svg>
+  );
+}
 
 export function TalkPage() {
   const [period, setPeriod] = useState<PeriodKey>(() => getPeriod().key);
@@ -75,14 +173,17 @@ export function TalkPage() {
   const [speaking, setSpeaking] = useState(false);
   const [muted, setMuted] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [heardText, setHeardText] = useState("");
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
 
   const messageId = useRef(1);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const messagesRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const stickerRef = useRef<HTMLImageElement>(null);
   const stickerSoundRef = useRef<HTMLAudioElement>(null);
   const generatedVoiceRef = useRef<HTMLAudioElement>(null);
+  const recognizerRef = useRef<SpeechRecognitionLike | null>(null);
 
   const clips = useRef<Clip[]>([]);
   const stickers = useRef<Sticker[]>(buildStickers(STICKER_IDS));
@@ -92,13 +193,18 @@ export function TalkPage() {
   const chainTimer = useRef(0);
   const speakingTimer = useRef(0);
   const mutedRef = useRef(false);
+  const listeningRef = useRef(false);
+  const transcriptRef = useRef("");
+  const finalTranscriptRef = useRef("");
+  const voiceErrorRef = useRef<string | null>(null);
+  const handleSayRef = useRef<(text: string) => void>(() => {});
 
   const isStickerMode = puppetMode === "sticker";
   const isVideoMode = puppetMode === "video";
 
   const stageBg = STAGE_BG[period];
 
-  const myMessages = messages.filter((message) => message.sender === "user");
+  const latestUserMessage = messages.filter((message) => message.sender === "user").at(-1);
 
   function appendMessage(text: string, sender: Sender) {
     setMessages((prev) => [...prev, { id: messageId.current++, text, sender }]);
@@ -273,6 +379,8 @@ export function TalkPage() {
     const text = rawText.trim();
     if (!text || isGenerating) return;
 
+    voiceErrorRef.current = null;
+    setVoiceError(null);
     appendMessage(text, "user");
     setIsGenerating(true);
     const history = historyForApi();
@@ -303,26 +411,140 @@ export function TalkPage() {
     }, 220);
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const input = inputRef.current;
-    if (!input) return;
-    handleSay(input.value);
-    input.value = "";
-    input.focus();
+  function setVoiceStatusError(message: string | null) {
+    voiceErrorRef.current = message;
+    setVoiceError(message);
   }
+
+  function messageForSpeechError(error?: string) {
+    if (error === "not-allowed" || error === "service-not-allowed") {
+      return "マイクの許可が ひつようです";
+    }
+    if (error === "no-speech") {
+      return "もう一度 はなしかけてね";
+    }
+    if (error === "audio-capture") {
+      return "マイクが 見つからないみたい";
+    }
+    return "うまく きこえなかったみたい";
+  }
+
+  function startListening() {
+    if (isGenerating || speaking) return;
+
+    const recognizer = recognizerRef.current;
+    if (!recognizer) {
+      setVoiceStatusError("このブラウザは 音声入力に 未対応です");
+      return;
+    }
+
+    generatedVoiceRef.current?.pause();
+    stickerSoundRef.current?.pause();
+    transcriptRef.current = "";
+    finalTranscriptRef.current = "";
+    setHeardText("");
+    setVoiceStatusError(null);
+    setListening(true);
+    listeningRef.current = true;
+
+    try {
+      recognizer.start();
+    } catch {
+      listeningRef.current = false;
+      setListening(false);
+      setVoiceStatusError("マイクを はじめられませんでした");
+    }
+  }
+
+  function stopListening() {
+    const recognizer = recognizerRef.current;
+    if (!recognizer) return;
+
+    try {
+      recognizer.stop();
+    } catch {
+      recognizer.abort();
+    }
+  }
+
+  function toggleListening() {
+    if (listening) {
+      stopListening();
+      return;
+    }
+    startListening();
+  }
+
+  useEffect(() => {
+    handleSayRef.current = handleSay;
+  });
+
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    setSpeechSupported(Boolean(SpeechRecognition));
+    if (!SpeechRecognition) return;
+
+    const recognizer = new SpeechRecognition();
+    recognizer.lang = "ja-JP";
+    recognizer.interimResults = true;
+    recognizer.continuous = false;
+
+    recognizer.onresult = (event) => {
+      let nextTranscript = "";
+      let hasFinal = false;
+
+      for (let index = 0; index < event.results.length; index += 1) {
+        const result = event.results[index];
+        nextTranscript += result[0]?.transcript ?? "";
+        hasFinal ||= result.isFinal;
+      }
+
+      const trimmed = nextTranscript.trim();
+      transcriptRef.current = trimmed;
+      if (hasFinal) finalTranscriptRef.current = trimmed;
+      setHeardText(trimmed);
+    };
+
+    recognizer.onerror = (event) => {
+      setVoiceStatusError(messageForSpeechError(event.error));
+    };
+
+    recognizer.onend = () => {
+      listeningRef.current = false;
+      setListening(false);
+
+      const said = (finalTranscriptRef.current || transcriptRef.current).trim();
+      finalTranscriptRef.current = "";
+      transcriptRef.current = "";
+
+      if (said) {
+        setVoiceStatusError(null);
+        handleSayRef.current(said);
+        return;
+      }
+
+      if (!voiceErrorRef.current) {
+        setVoiceStatusError("うまく きこえなかったみたい");
+      }
+    };
+
+    recognizerRef.current = recognizer;
+
+    return () => {
+      recognizer.onresult = null;
+      recognizer.onerror = null;
+      recognizer.onend = null;
+      recognizer.abort();
+      recognizerRef.current = null;
+      listeningRef.current = false;
+    };
+  }, []);
 
   // Keep the background period in sync with the clock.
   useEffect(() => {
     const id = window.setInterval(() => setPeriod(getPeriod().key), 60 * 1000);
     return () => window.clearInterval(id);
   }, []);
-
-  // Auto-scroll the message log to the latest bubble.
-  useEffect(() => {
-    const el = messagesRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages]);
 
   // Load the sticker pack manifest and any local clip manifest once on mount.
   useEffect(() => {
@@ -380,11 +602,45 @@ export function TalkPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const transcriptDisplay = voiceError ? "" : heardText || (!listening ? latestUserMessage?.text ?? "" : "");
+  const voiceBusy = isGenerating || speaking;
+  const voiceButtonDisabled = (!speechSupported && !listening) || (!listening && voiceBusy);
+  const statusLabel = speaking
+    ? "おはなし ちゅう♪"
+    : isGenerating
+      ? "かんがえ中…"
+      : listening
+        ? "きいてるよ…"
+        : "まってるよ";
+  const statusDot = speaking ? YELLOW : isGenerating ? BLUE : listening ? RED : LISTEN_DOT;
+  const hintText = voiceError
+    ? voiceError
+    : isGenerating
+      ? "スンスンが かんがえています"
+      : speaking
+        ? "スンスンが おへんじしています"
+        : listening
+          ? "きいてるよ、どうぞ〜"
+          : speechSupported
+            ? "タップして はなしかけてね"
+            : "このブラウザは 音声入力に 未対応です";
+  const orbBackground = listening ? LISTEN_DOT : voiceBusy || !speechSupported ? "#E4D8B8" : YELLOW;
+  const orbIconColor = listening ? "#fff" : INK;
+  const waveActive = listening || isGenerating || speaking;
+  const waveColor = listening ? LISTEN_DOT : isGenerating ? BLUE : speaking ? YELLOW : "#E4D8B8";
+  const orbLabel = listening
+    ? "LISTENING... TAP TO STOP"
+    : isGenerating
+      ? "THINKING..."
+      : speaking
+        ? "SUNSUN TALKING"
+        : "TAP TO TALK";
+
   return (
     <main
       className={cn(
         "relative flex min-h-[100svh] w-full flex-col items-center",
-        "px-0 pt-[10px] pb-0",
+        "px-[clamp(10px,4vw,24px)] pt-[clamp(12px,3vh,32px)] pb-[clamp(12px,3vh,32px)]",
       )}
       style={{ background: PAGE_BG, color: INK }}
       data-period={period}
@@ -397,23 +653,31 @@ export function TalkPage() {
       />
 
       {/* title lockup — the header logo stays as the wordmark */}
-      <header className="relative z-[1] mb-[clamp(6px,1vh,10px)] shrink-0 text-center max-[680px]:mb-[8px]">
+      <header className="relative z-[1] mb-[clamp(10px,2vh,22px)] shrink-0 text-center max-[680px]:mb-[10px]">
         <h1 className="m-0 leading-[0]">
           <img
-            className="mx-auto block h-auto w-[clamp(150px,28vw,200px)] max-w-full select-none object-contain [-webkit-user-drag:none] max-[680px]:w-[168px]"
+            className="mx-auto block h-auto w-[clamp(148px,26vw,196px)] max-w-full select-none object-contain [-webkit-user-drag:none] max-[680px]:w-[158px]"
             src="/assets/header_logo.png"
             alt="PUPPET TALK"
             style={{ filter: "brightness(0)" }}
           />
         </h1>
+        <p className="m-0 mt-[7px] text-[clamp(22px,4vw,34px)] font-black leading-[1.1]">
+          こえだけで おしゃべり
+        </p>
       </header>
 
       {/* ============ APP VIEWPORT ============ */}
       <section
         className={cn(
-          "relative z-[1] flex min-h-0 w-full max-w-[480px] flex-1 flex-col overflow-hidden",
+          "relative z-[1] flex min-h-0 w-full max-w-[392px] flex-1 flex-col overflow-hidden rounded-[46px]",
+          "max-h-[812px] max-[440px]:rounded-[34px]",
         )}
-        style={{ background: PANEL_BG }}
+        style={{
+          background: PANEL_BG,
+          border: `4px solid ${INK}`,
+          boxShadow: "0 22px 50px -12px rgba(22,19,14,0.4)",
+        }}
         aria-label="おしゃべりステージ"
       >
         {/* ===== STAGE ===== */}
@@ -428,6 +692,31 @@ export function TalkPage() {
             style={{ backgroundImage: GRAIN }}
           />
 
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 z-[4] h-[96px]"
+            style={{
+              background: `linear-gradient(180deg, ${stageBg} 0%, ${stageBg} 34%, transparent 100%)`,
+            }}
+          />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute bottom-0 right-0 top-0 z-[4] w-[150px]"
+            style={{
+              background: `linear-gradient(270deg, ${stageBg} 0%, ${stageBg} 28%, transparent 100%)`,
+            }}
+          />
+
+          {speaking && (
+            <div
+              aria-hidden="true"
+              className="absolute left-1/2 top-[42%] z-[2] h-[58px] w-[58px] -translate-x-1/2"
+            >
+              <span className="absolute inset-0 rounded-full border-[3px] border-white/85 animate-[voiceRing_1.3s_ease-out_infinite]" />
+              <span className="absolute inset-0 rounded-full border-[3px] border-white/85 animate-[voiceRing_1.3s_ease-out_infinite_650ms]" />
+            </div>
+          )}
+
           {/* status pill + mute toggle */}
           <div className="absolute inset-x-[16px] top-[16px] z-[7] flex items-center justify-between">
             <span
@@ -436,23 +725,24 @@ export function TalkPage() {
             >
               <span
                 className="inline-block h-[8px] w-[8px] rounded-full"
-                style={{ background: speaking ? YELLOW : LISTEN_DOT }}
+                style={{ background: statusDot }}
               />
-              {speaking ? "おはなし ちゅう♪" : "きいてるよ"}
+              {statusLabel}
             </span>
             <button
               type="button"
               onClick={toggleMute}
-              className="rounded-full px-[12px] py-[7px] text-[11.5px] font-bold transition-transform duration-150 active:translate-y-px"
+              className="grid h-[36px] w-[36px] place-items-center rounded-full transition-transform duration-150 active:translate-y-px"
               style={{
                 border: `2.5px solid ${INK}`,
                 background: muted ? PANEL_BG : INK,
                 color: muted ? INK : "#fff",
               }}
               aria-pressed={muted}
+              aria-label={muted ? "音声をオンにする" : "音声をオフにする"}
               title={muted ? "音声をオンにする" : "音声をオフにする"}
             >
-              {muted ? "音声 OFF" : "音声 ON"}
+              <SpeakerIcon muted={muted} color={muted ? INK : "#fff"} />
             </button>
           </div>
 
@@ -474,7 +764,13 @@ export function TalkPage() {
                 alt="スンスン ステッカー"
                 style={
                   puppetMode === "sticker"
-                    ? { animation: isStickerTalking ? "stickerPop 700ms ease both" : "none" }
+                    ? {
+                        animation: speaking
+                          ? "suntalk 520ms ease-in-out infinite"
+                          : isStickerTalking
+                            ? "stickerPop 700ms ease both"
+                            : "none",
+                      }
                     : undefined
                 }
                 onError={() => {
@@ -604,114 +900,81 @@ export function TalkPage() {
           }}
         />
 
-        {/* ===== BOTTOM (input area) ===== */}
+        {/* ===== BOTTOM (voice area) ===== */}
         <div
-          className="flex min-h-[210px] flex-[1_1_0] flex-col"
+          className="flex min-h-[258px] flex-[1_1_0] flex-col items-center justify-center gap-[15px] px-[20px] py-[18px]"
           style={{ background: PANEL_BG, borderTop: `3px solid ${INK}` }}
         >
-          {/* your transcript */}
-          <div
-            ref={messagesRef}
-            id="messages"
-            className="flex min-h-0 flex-1 flex-col gap-[9px] overflow-y-auto px-[16px] pt-[16px] pb-[4px] [scrollbar-width:thin]"
-          >
-            <div className="text-center">
-              <span
-                className="text-[10.5px] font-semibold uppercase tracking-[0.18em]"
-                style={{ fontFamily: "'Zilla Slab', serif", color: "#a48a55" }}
+          <div className="flex min-h-[54px] w-full items-center justify-center px-[8px] text-center">
+            {transcriptDisplay ? (
+              <div
+                className="max-w-full animate-[bubbleIn_240ms_ease_both] break-words text-[17px] font-bold leading-[1.45]"
+                style={{ color: INK }}
               >
-                Your messages
-              </span>
-            </div>
-            {myMessages.length === 0 && (
-              <div className="mt-[6px] text-center text-[12.5px] font-medium" style={{ color: "#a48a55" }}>
-                スンスンに はなしかけてみてね
+                「{transcriptDisplay}」
               </div>
-            )}
-            {myMessages.map((message) => (
-              <div key={message.id} className="flex justify-end">
-                <div
-                  className="max-w-[80%] animate-[bubbleIn_240ms_ease_both] text-[14px] font-medium leading-[1.45] text-white"
-                  style={{
-                    background: BLUE,
-                    border: `2.5px solid ${INK}`,
-                    borderRadius: "18px 18px 6px 18px",
-                    padding: "9px 14px",
-                    boxShadow: "0 2px 0 rgba(22,19,14,.18)",
-                  }}
-                >
-                  {message.text}
-                </div>
-              </div>
-            ))}
-            {isGenerating && (
-              <div className="mt-[6px] text-center text-[12.5px] font-medium" style={{ color: "#a48a55" }}>
-                スンスンが かんがえています
+            ) : (
+              <div className="text-[15px] font-medium leading-[1.45]" style={{ color: "#a48a55" }}>
+                {hintText}
               </div>
             )}
           </div>
 
-          {/* quick chips */}
-          <div
-            className="flex shrink-0 gap-[8px] overflow-x-auto px-[16px] pt-[6px] pb-[4px] [scrollbar-width:thin]"
-            aria-label="入力候補"
+          <button
+            type="button"
+            onClick={toggleListening}
+            disabled={voiceButtonDisabled}
+            aria-label={listening ? "音声入力を止める" : "音声入力を始める"}
+            aria-pressed={listening}
+            className={cn(
+              "relative h-[132px] w-[132px] shrink-0 p-0 transition-transform duration-150",
+              voiceButtonDisabled ? "cursor-not-allowed opacity-70" : "hover:-translate-y-[2px] active:translate-y-px",
+            )}
+            style={{ background: "none" }}
           >
-            {QUICK_REPLIES.map((label, index) => (
-              <button
-                key={label}
-                type="button"
-                onClick={() => handleSay(label)}
-                disabled={isGenerating}
-                className="inline-flex shrink-0 items-center gap-[6px] whitespace-nowrap rounded-full px-[15px] py-[8px] text-[13px] font-bold transition-transform duration-150 hover:-translate-y-px active:translate-y-px"
-                style={{
-                  background: "#FFFDF7",
-                  color: INK,
-                  border: `2.5px solid ${INK}`,
-                  boxShadow: "0 2px 0 rgba(22,19,14,.14)",
-                }}
-              >
-                <span
-                  className="inline-block h-[8px] w-[8px] rounded-full"
-                  style={{ background: CHIP_DOTS[index % CHIP_DOTS.length] }}
-                />
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {/* input */}
-          <form
-            className="flex shrink-0 items-center gap-[10px] px-[16px] pt-[8px] pb-[18px]"
-            onSubmit={handleSubmit}
-          >
-            <input
-              ref={inputRef}
-              type="text"
-              autoComplete="off"
-              placeholder="スンスンに はなしかける…"
-              aria-label="スンスンに はなしかける"
-              disabled={isGenerating}
-              className="h-[52px] min-w-0 flex-1 rounded-full px-[16px] text-[15px] font-medium outline-none placeholder:font-medium placeholder:text-[#9c8a63]"
-              style={{ background: "#fff", border: `2.5px solid ${INK}`, color: INK }}
-            />
-            <button
-              className="grid h-[52px] w-[52px] shrink-0 place-items-center rounded-full text-[22px] transition-transform duration-150 hover:-translate-y-px active:translate-y-px"
+            <span
+              aria-hidden="true"
+              className="absolute inset-0 [animation:orbWob_5s_ease-in-out_infinite]"
               style={{
-                background: YELLOW,
-                border: `2.5px solid ${INK}`,
-                boxShadow: "0 3px 0 rgba(22,19,14,.35)",
-                fontFamily: "'Baloo 2', cursive",
-                fontWeight: 800,
-                color: INK,
+                background: orbBackground,
+                border: `4px solid ${INK}`,
+                borderRadius: "48% 52% 55% 45% / 52% 48% 52% 48%",
+                boxShadow: "0 6px 0 rgba(22,19,14,.3)",
               }}
-              type="submit"
-              disabled={isGenerating}
-              title="送信"
-              aria-label="送信"
-            >
-              ↑
-            </button>
-          </form>
+            />
+            {listening && (
+              <span
+                aria-hidden="true"
+                className="absolute inset-[-11px] rounded-full border-[3px] border-[#5BB56A]/45 animate-[voiceRing_1.15s_ease-out_infinite]"
+              />
+            )}
+            <span className="absolute inset-0 grid place-items-center">
+              <MicrophoneIcon color={orbIconColor} />
+            </span>
+          </button>
+
+          <div className="flex h-[28px] shrink-0 items-end gap-[4px]" aria-hidden="true">
+            {EQ_BARS.map((bar, index) => (
+              <span
+                key={`${bar.duration}-${bar.delay}-${index}`}
+                className="w-[5px] rounded-[3px] [transform-origin:50%_100%]"
+                style={{
+                  height: 26,
+                  background: waveColor,
+                  animation: `equalizer ${bar.duration} ease-in-out infinite`,
+                  animationDelay: bar.delay,
+                  animationPlayState: waveActive ? "running" : "paused",
+                }}
+              />
+            ))}
+          </div>
+
+          <div
+            className="min-h-[14px] text-center text-[11px] font-semibold uppercase tracking-[0.16em]"
+            style={{ color: "#a48a55", fontFamily: "'Zilla Slab', serif" }}
+          >
+            {orbLabel}
+          </div>
         </div>
       </section>
     </main>
