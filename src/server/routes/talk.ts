@@ -1,8 +1,13 @@
 import type { TalkHistoryMessage, TalkResponse } from "../../api-contracts/talk";
 import { replyFor } from "../domain/fallbackReplies";
-import { generateSpeech } from "../services/openai/speech";
+import { generateSpeech } from "../services/elevenlabs/speech";
 import { generateText } from "../services/openai/responses";
-import type { ServerApp } from "../types";
+import type { Env, ServerApp } from "../types";
+
+function modeFor(env: Env, speechGenerated = false): TalkResponse["mode"] {
+  if (speechGenerated) return "elevenlabs";
+  return env.OPENAI_API_KEY ? "openai" : "fallback";
+}
 
 function parseHistory(value: unknown): TalkHistoryMessage[] {
   if (!Array.isArray(value)) return [];
@@ -58,7 +63,7 @@ export function registerTalkRoute(app: ServerApp) {
         reply,
         audioUrl: speech?.dataUrl ?? null,
         audioContentType: speech?.contentType ?? null,
-        mode: c.env.OPENAI_API_KEY ? "openai" : "fallback",
+        mode: modeFor(c.env, Boolean(speech)),
       };
 
       return c.json(response);
@@ -70,8 +75,8 @@ export function registerTalkRoute(app: ServerApp) {
         reply,
         audioUrl: null,
         audioContentType: null,
-        mode: c.env.OPENAI_API_KEY ? "openai" : "fallback",
-        warning: "OpenAI speech generation failed; returned text reply without audio.",
+        mode: modeFor(c.env),
+        warning: "ElevenLabs speech generation failed; returned text reply without audio.",
       };
 
       return c.json(response, 200);

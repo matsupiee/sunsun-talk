@@ -1,5 +1,5 @@
 export type TalkRole = "user" | "assistant";
-export type TalkMode = "openai" | "fallback";
+export type TalkMode = "openai" | "elevenlabs" | "fallback";
 
 export interface TalkHistoryMessage {
   role: TalkRole;

@@ -22,7 +22,7 @@ export async function remoteTalkFor(
         audioUrl: typeof data.audioUrl === "string" ? data.audioUrl : null,
         audioContentType:
           typeof data.audioContentType === "string" ? data.audioContentType : null,
-        mode: data.mode === "openai" ? "openai" : "fallback",
+        mode: data.mode === "openai" || data.mode === "elevenlabs" ? data.mode : "fallback",
       };
     }
   } catch {
