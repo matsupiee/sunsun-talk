@@ -5,14 +5,12 @@ import {
   STICKER_BASE,
   STICKER_IDS,
   type PeriodKey,
-} from "./constants";
-import {
-  buildStickers,
-  getPeriod,
-  normalize,
-  remoteReplyFor,
-  type Sticker,
-} from "./talk";
+} from "./_utils/constants";
+import { normalize } from "./_utils/localFallback";
+import { getPeriod } from "./_utils/period";
+import { buildStickers, type Sticker } from "./_utils/stickers";
+import { remoteTalkFor } from "./_utils/talkApi";
+import type { TalkHistoryMessage } from "../../../api-contracts/talk";
 
 type Sender = "user" | "puppet";
 type PuppetMode = "sticker" | "video" | "fallback";
@@ -38,7 +36,6 @@ const PAGE_BG = "#FBF4E1";
 const PANEL_BG = "#FCF8EE";
 const YELLOW = "#F3B01C";
 const BLUE = "#3E93D0";
-const GOLD = "#C98A00";
 const LISTEN_DOT = "#5BB56A";
 
 // The paper-grain texture used across the page and the stage.
@@ -77,6 +74,7 @@ export function TalkPage() {
   const [isFallbackTalking, setIsFallbackTalking] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const messageId = useRef(1);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -84,6 +82,7 @@ export function TalkPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const stickerRef = useRef<HTMLImageElement>(null);
   const stickerSoundRef = useRef<HTMLAudioElement>(null);
+  const generatedVoiceRef = useRef<HTMLAudioElement>(null);
 
   const clips = useRef<Clip[]>([]);
   const stickers = useRef<Sticker[]>(buildStickers(STICKER_IDS));
@@ -99,14 +98,17 @@ export function TalkPage() {
 
   const stageBg = STAGE_BG[period];
 
-  // The puppet's latest line becomes the caption; user lines fill the transcript.
-  const puppetMessages = messages.filter((message) => message.sender === "puppet");
-  const caption = puppetMessages.at(-1)?.text ?? DEFAULT_CAPTION;
-  const captionKey = puppetMessages.length;
   const myMessages = messages.filter((message) => message.sender === "user");
 
   function appendMessage(text: string, sender: Sender) {
     setMessages((prev) => [...prev, { id: messageId.current++, text, sender }]);
+  }
+
+  function historyForApi(): TalkHistoryMessage[] {
+    return messages.slice(-10).map<TalkHistoryMessage>((message) => ({
+      role: message.sender === "puppet" ? "assistant" : "user",
+      content: message.text,
+    }));
   }
 
   function markSpeaking(text: string) {
@@ -120,7 +122,11 @@ export function TalkPage() {
     setMuted((prev) => {
       const next = !prev;
       mutedRef.current = next;
-      if (next) stickerSoundRef.current?.pause();
+      if (next) {
+        stickerSoundRef.current?.pause();
+        generatedVoiceRef.current?.pause();
+        setSpeaking(false);
+      }
       return next;
     });
   }
@@ -189,6 +195,36 @@ export function TalkPage() {
     }
   }
 
+  async function playGeneratedVoice(audioUrl: string) {
+    const audio = generatedVoiceRef.current;
+    const stickerSound = stickerSoundRef.current;
+    const video = videoRef.current;
+
+    if (!audio || mutedRef.current) return false;
+
+    video?.pause();
+    stickerSound?.pause();
+    window.clearTimeout(chainTimer.current);
+    window.clearTimeout(speakingTimer.current);
+
+    setPuppetMode("sticker");
+    setIsStickerTalking(true);
+    setSpeaking(true);
+
+    audio.pause();
+    audio.src = audioUrl;
+    audio.currentTime = 0;
+
+    try {
+      await audio.play();
+      return true;
+    } catch {
+      setSpeaking(false);
+      setIsStickerTalking(false);
+      return false;
+    }
+  }
+
   function pickClipIndex(): number {
     if (clips.current.length <= 1) return 0;
 
@@ -233,32 +269,36 @@ export function TalkPage() {
     chainTimer.current = window.setTimeout(playRandomClip, delay);
   }
 
-  function addPickedClips(fileList: FileList | null) {
-    const picked: Clip[] = Array.from(fileList ?? []).map((file) => ({
-      name: file.name,
-      src: URL.createObjectURL(file),
-    }));
-
-    clips.current = [...clips.current, ...picked];
-    if (picked.length) {
-      playRandomClip();
-    }
-  }
-
   function handleSay(rawText: string) {
     const text = rawText.trim();
-    if (!text) return;
+    if (!text || isGenerating) return;
 
     appendMessage(text, "user");
+    setIsGenerating(true);
+    const history = historyForApi();
 
     window.setTimeout(async () => {
-      const response = await remoteReplyFor(text);
-      appendMessage(response, "puppet");
-      markSpeaking(response);
-      if (clips.current.length) {
-        playRandomClip();
-      } else {
-        playSticker(stickerForInput(text));
+      try {
+        const response = await remoteTalkFor(text, history);
+        appendMessage(response.reply, "puppet");
+
+        if (response.audioUrl) {
+          playSticker(stickerForInput(text), { sound: false });
+          const played = await playGeneratedVoice(response.audioUrl);
+          if (!played) {
+            markSpeaking(response.reply);
+            playSticker(stickerForInput(text));
+          }
+        } else {
+          markSpeaking(response.reply);
+          if (clips.current.length) {
+            playRandomClip();
+          } else {
+            playSticker(stickerForInput(text));
+          }
+        }
+      } finally {
+        setIsGenerating(false);
       }
     }, 220);
   }
@@ -550,6 +590,19 @@ export function TalkPage() {
         </div>
 
         <audio ref={stickerSoundRef} id="stickerSound" preload="auto" />
+        <audio
+          ref={generatedVoiceRef}
+          id="generatedVoice"
+          preload="auto"
+          onEnded={() => {
+            setSpeaking(false);
+            setIsStickerTalking(false);
+          }}
+          onError={() => {
+            setSpeaking(false);
+            setIsStickerTalking(false);
+          }}
+        />
 
         {/* ===== BOTTOM (input area) ===== */}
         <div
@@ -591,6 +644,11 @@ export function TalkPage() {
                 </div>
               </div>
             ))}
+            {isGenerating && (
+              <div className="mt-[6px] text-center text-[12.5px] font-medium" style={{ color: "#a48a55" }}>
+                スンスンが かんがえています
+              </div>
+            )}
           </div>
 
           {/* quick chips */}
@@ -603,6 +661,7 @@ export function TalkPage() {
                 key={label}
                 type="button"
                 onClick={() => handleSay(label)}
+                disabled={isGenerating}
                 className="inline-flex shrink-0 items-center gap-[6px] whitespace-nowrap rounded-full px-[15px] py-[8px] text-[13px] font-bold transition-transform duration-150 hover:-translate-y-px active:translate-y-px"
                 style={{
                   background: "#FFFDF7",
@@ -631,6 +690,7 @@ export function TalkPage() {
               autoComplete="off"
               placeholder="スンスンに はなしかける…"
               aria-label="スンスンに はなしかける"
+              disabled={isGenerating}
               className="h-[52px] min-w-0 flex-1 rounded-full px-[16px] text-[15px] font-medium outline-none placeholder:font-medium placeholder:text-[#9c8a63]"
               style={{ background: "#fff", border: `2.5px solid ${INK}`, color: INK }}
             />
@@ -645,6 +705,7 @@ export function TalkPage() {
                 color: INK,
               }}
               type="submit"
+              disabled={isGenerating}
               title="送信"
               aria-label="送信"
             >

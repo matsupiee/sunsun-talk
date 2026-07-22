@@ -4,7 +4,7 @@ import {
   createRouter,
   Outlet,
 } from "@tanstack/react-router";
-import { TalkPage } from "./features/talk/TalkPage";
+import { TalkPage } from "./features/talk/page";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
