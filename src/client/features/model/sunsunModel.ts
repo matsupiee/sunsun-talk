@@ -271,7 +271,8 @@ function buildMouth(): THREE.Mesh {
     side: THREE.DoubleSide,
   });
   // 単位円 → 半幅0.32・半高0.16 の楕円にし、x を弧長として筒面に巻き付ける。
-  const R = 0.456;
+  // この高さの体表半径は ≒0.458 なので、確実に表へ出るよう少し大きく。
+  const R = 0.475;
   const geo = new THREE.CircleGeometry(1, 48);
   const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
   for (let i = 0; i < posAttr.count; i++) {
