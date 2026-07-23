@@ -19,7 +19,7 @@ import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.j
 const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
 const FUR_ROOT = "#2f6be6"; // 毛束の根元〜中間（鮮やかなコバルト寄りブルー）
-const FUR_TIP = "#cde6ff"; // 毛束の毛先（白っぽい空色のチップ）
+const FUR_TIP = "#d8ecff"; // 毛束の毛先（白っぽい空色のチップ）
 const SKIN_BASE = "#3f8ae8"; // 毛の隙間から見える地肌（鮮やかなブルー）
 const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
 const PUPIL = "#141210"; // 黒目・鼻・口の黒
@@ -156,7 +156,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     if (p.distanceTo(NOSE_POS) < 0.11) continue;
     // 口デカール（半幅0.16・半高0.085）よりひと回り狭い範囲だけ毛を避ける。
     // デカールが無毛域を完全に覆い隠し、外周の毛が縁に被さる。
-    if (Math.abs(p.y - 1.74) < 0.04 && Math.abs(p.x) < 0.09 && p.z > 0.25) continue;
+    if (Math.abs(p.y - 1.74) < 0.035 && Math.abs(p.x) < 0.075 && p.z > 0.25) continue;
 
     // 顔の正面上部は短毛にして、目・鼻・口が読めるようにする（無毛地帯は作らない）。
     // 二値ではなく滑らかなグラデーションで移行し、胴との「継ぎ目」を作らない。
@@ -171,9 +171,9 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     if ((dEyeL < 0.3 || dEyeR < 0.3) && p.z > 0.12) lengthScale *= 0.6;
     // 口の周囲リングもやや短毛にして、毛が開口に垂れて口を隠さないようにする
     // （短くしすぎると刈り込み跡に見えるので控えめに）。
-    if (Math.abs(p.y - 1.75) < 0.2 && p.z > 0.1) lengthScale *= 0.7;
+    if (Math.abs(p.y - 1.75) < 0.2 && p.z > 0.1) lengthScale *= 0.8;
     // 口の直近リングはさらに短くして、毛が開口へ被らないようにする。
-    if (Math.abs(p.y - 1.75) < 0.12 && p.z > 0.2) lengthScale *= 0.55;
+    if (Math.abs(p.y - 1.75) < 0.12 && p.z > 0.2) lengthScale *= 0.7;
     // 頭頂は毛を少し長くして地肌・根元の露出を埋める。
     if (n.y > 0.5) lengthScale *= 1.15;
 
@@ -195,7 +195,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
         clump * 0.35,
         Math.cos(p.x * 5.5 + p.y * 4.6) * 0.7 + (Math.random() - 0.5) * 0.22,
       )
-      .multiplyScalar(0.4);
+      .multiplyScalar(0.3);
     // 上向き法線ほど追加で寝かせる。寝かせすぎると毛が倒れて根元の濃色が
     // 真上から露出し、頭頂だけ濃い斑に見えるため控えめに。
     const crownDroop = Math.max(0, n.y) * 0.45;
@@ -217,7 +217,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     // 毛束ごとの明るさのゆらぎ（ムラは控えめにして斑点ノイズを避ける）。
     // わずかに青へ寄せて、強い光でも水色の印象が飛ばないようにする。
     // 短毛（顔まわり）は根元の暗色が支配的になるため明るめに補正する。
-    let v = 0.88 + Math.random() * 0.12;
+    let v = 0.9 + Math.random() * 0.1;
     // 短毛ほど根元の暗色が支配的になるため、顔の度合いに応じて滑らかに明るく。
     v *= 1 + 0.35 * Math.min(1, faceT);
     // 頭頂（上向き法線）は真上から根元が見えて暗く沈みやすいので少し持ち上げる。
