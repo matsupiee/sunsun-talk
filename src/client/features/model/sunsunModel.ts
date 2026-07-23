@@ -163,7 +163,9 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     if (p.distanceTo(NOSE_POS) < 0.11) continue;
     // 口デカール（半幅0.16・半高0.085）よりひと回り狭い範囲だけ毛を避ける。
     // デカールが無毛域を完全に覆い隠し、外周の毛が縁に被さる。
-    if (Math.abs(p.y - 1.745) < 0.035 && Math.abs(p.x) < 0.075 && p.z > 0.25) continue;
+    // 口デカールの内側に毛先が突き抜けると「歯のような斑点」に見えるため、
+    // デカール（半幅0.115）より一回り狭い範囲をしっかり無毛にする。
+    if (Math.abs(p.y - 1.75) < 0.05 && Math.abs(p.x) < 0.095 && p.z > 0.25) continue;
 
     // 顔の正面上部は短毛にして、目・鼻・口が読めるようにする（無毛地帯は作らない）。
     // 二値ではなく滑らかなグラデーションで移行し、胴との「継ぎ目」を作らない。
@@ -319,8 +321,8 @@ function buildMouth(): THREE.Mesh {
   // 単位円 → 半幅0.16・半高0.085 の小さな楕円にし、x を弧長として筒面に巻き付ける。
   // 地肌(≒0.458)より上・毛の垂れ(≒0.5)より中央は上。縁の沈み込みは
   // 毛の垂れ境界までに留め、視点が回っても口が欠けないようにする。
-  const R_CENTER = 0.515;
-  const R_EDGE = 0.495;
+  const R_CENTER = 0.525;
+  const R_EDGE = 0.5;
   const geo = new THREE.CircleGeometry(1, 48);
   const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
   for (let i = 0; i < posAttr.count; i++) {
