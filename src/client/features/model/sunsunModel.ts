@@ -119,7 +119,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     // 白化は毛先の2〜3割に限定し、中腹までは鮮やかな青を保つ
     // （指数が低いと全体が白く飛んでラベンダー/グレー寄りに見える）。
     // 頭頂の根元露出はインスタンス色の明度補正側で相殺する。
-    c.copy(rootColor).lerp(tipColor, Math.pow(t, 2.6));
+    c.copy(rootColor).lerp(tipColor, Math.pow(t, 3.0));
     colors[i * 3] = c.r;
     colors[i * 3 + 1] = c.g;
     colors[i * 3 + 2] = c.b;
@@ -354,17 +354,17 @@ function buildHand(side: 1 | -1): THREE.Group {
   knuckle.castShadow = true;
   group.add(knuckle);
 
-  // 長くしなやかな 4 本指。実際の手のように指ごとに長さを変えて有機的に。
-  // 実物写真の「長い指が軽く開く」印象に合わせ、長め＋やや細め＋広めの放射。
-  const fingerLens = [0.85, 0.98, 1.0, 0.82]; // 人差し指〜小指相当（手の過半を指が占める）
+  // 長い 4 本指。1本ずつが別々の棒に見えると「傘の骨」になるため、
+  // 幅広・扁平な指を同一平面に置き、根元をナックル板に深く埋めて
+  // 手全体が「切れ込みの入った一枚のフェルト」として読めるようにする。
+  const fingerLens = [0.7, 0.8, 0.82, 0.68]; // 人差し指〜小指相当
   for (let i = 0; i < 4; i++) {
-    // 細いと熊手状に見えるため、フェルトらしい厚みのある太さにする。
-    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.082, fingerLens[i], 6, 12), mat);
-    // 開きすぎると熊手状に見えるので、根元は寄せて先だけ軽く開く。
-    const fan = (i - 1.5) * 0.17;
-    finger.position.set((i - 1.5) * 0.15, -0.66 - fingerLens[i] * 0.08, 0);
+    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, fingerLens[i], 6, 12), mat);
+    // 開きは控えめの扇。根元は互いにほぼ接し、先だけ軽く開く。
+    const fan = (i - 1.5) * 0.1;
+    finger.position.set((i - 1.5) * 0.155, -0.58 - fingerLens[i] * 0.08, 0);
     finger.rotation.z = -fan;
-    finger.scale.z = 0.42; // 断面を扁平に（丸棒でなく平リボンのフェルト感）
+    finger.scale.z = 0.38; // 断面を扁平に（丸棒でなく平リボンのフェルト感）
     finger.castShadow = true;
     group.add(finger);
   }
@@ -396,7 +396,8 @@ function buildArm(side: 1 | -1): THREE.Group {
   const hand = buildHand(side);
   hand.position.y = -1.53;
   // 手のひらはやや体側へ。正面からも開いた指が見える程度に留める。
-  hand.rotation.y = -side * 0.1;
+  // ひねりを付けると自動回転中のスクショで指同士が交差して見えるため正面向きに。
+  hand.rotation.y = 0;
   hand.scale.setScalar(1.05);
   group.add(hand);
 
