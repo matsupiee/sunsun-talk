@@ -152,15 +152,17 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     const dEyeR = p.distanceTo(EYE_R_POS);
     if (dEyeL < 0.155 || dEyeR < 0.155) continue;
     if (p.distanceTo(NOSE_POS) < 0.11) continue;
-    // 口パッチ（幅≒0.56・高さ≒0.27）よりわずかに狭い範囲だけ毛を避ける。
-    // パッチが無毛域を覆い隠しつつ、外周の毛が縁にちょうど被さる。
-    if (Math.abs(p.y - 1.68) < 0.12 && Math.abs(p.x) < 0.26 && p.z > 0.2) continue;
+    // 口デカール（半幅0.32・半高0.16）よりわずかに狭い範囲だけ毛を避ける。
+    // デカールが無毛域を覆い隠しつつ、外周の毛が縁にちょうど被さる。
+    if (Math.abs(p.y - 1.68) < 0.145 && Math.abs(p.x) < 0.3 && p.z > 0.2) continue;
 
     // 顔の正面上部は短毛にして、目・鼻・口が読めるようにする（無毛地帯は作らない）。
     const nearFace = p.y > 1.45 && p.z > 0.05;
     let lengthScale = nearFace ? 0.55 : 1.0;
     // 目のすぐ近くはさらに短毛にして、白目が毛の上に半分埋まって見えるようにする。
     if (dEyeL < 0.3 || dEyeR < 0.3) lengthScale *= 0.45;
+    // 口の周囲リングも短毛にして、毛が開口に垂れて口を隠さないようにする。
+    if (Math.abs(p.y - 1.68) < 0.26 && p.z > 0.1) lengthScale *= 0.55;
 
     // 15% は長めの「差し毛」にして、輪郭を大ぶりに波打たせる。
     const guardHair = !nearFace && Math.random() < 0.12;
@@ -268,13 +270,13 @@ function buildMouth(): THREE.Mesh {
     metalness: 0.0,
     side: THREE.DoubleSide,
   });
-  // 単位円 → 半幅0.29・半高0.14 の楕円にし、x を弧長として筒面に巻き付ける。
-  const R = 0.452;
+  // 単位円 → 半幅0.32・半高0.16 の楕円にし、x を弧長として筒面に巻き付ける。
+  const R = 0.456;
   const geo = new THREE.CircleGeometry(1, 48);
   const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
   for (let i = 0; i < posAttr.count; i++) {
-    const ex = posAttr.getX(i) * 0.29;
-    const ey = posAttr.getY(i) * 0.14;
+    const ex = posAttr.getX(i) * 0.32;
+    const ey = posAttr.getY(i) * 0.16;
     const theta = ex / R;
     posAttr.setXYZ(i, R * Math.sin(theta), ey, R * Math.cos(theta));
   }
