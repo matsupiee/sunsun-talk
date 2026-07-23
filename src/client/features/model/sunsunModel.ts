@@ -40,6 +40,20 @@ export interface SunsunModelParts {
   arms: THREE.Group[];
   /** 体のファー（毛束の InstancedMesh）。visible でもこもこON/OFF */
   fur: THREE.InstancedMesh;
+  /**
+   * 実写リファレンス（公式ステッカー写真から生成した展開テクスチャ）を
+   * 毛束ごとのティントに適用する。画像のロード完了後に呼ぶ。
+   */
+  applyFurReference: (image: HTMLImageElement, meta: FurRefMeta) => void;
+}
+
+/** fur-ref.json のマッピング情報（scripts で生成）。 */
+export interface FurRefMeta {
+  width: number;
+  height: number;
+  /** 展開テクスチャ上で鼻の高さに当たる行。 */
+  noseRow: number;
+  meanColor: [number, number, number];
 }
 
 function skinMaterial(color: string) {
@@ -106,7 +120,19 @@ const NOSE_POS = new THREE.Vector3(0, 1.94, 0.46);
  * - 法線方向＋下向きの「毛流れ」で、実物のやや垂れた長毛ファーに寄せる
  * - 目・鼻・口のまわりは毛を避け、顔の正面は短毛にして表情を隠さない
  */
-function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
+/** 毛束1本ごとの配置情報。実写ティントの再計算に使う。 */
+interface TuftData {
+  /** 体表のサンプル位置 */
+  px: Float32Array;
+  py: Float32Array;
+  pz: Float32Array;
+  /** 法線の上向き成分 */
+  ny: Float32Array;
+  /** 顔の度合い（0=胴, 1=顔正面） */
+  faceT: Float32Array;
+}
+
+function buildFur(body: THREE.Mesh): { fur: THREE.InstancedMesh; tufts: TuftData } {
   const COUNT = 60000;
 
   // 毛束テンプレート。根元を原点、+Y へ長さ 1 の細い錐。
@@ -122,7 +148,9 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     // 白化は毛先の2〜3割に限定し、中腹までは鮮やかな青を保つ
     // （指数が低いと全体が白く飛んでラベンダー/グレー寄りに見える）。
     // 頭頂の根元露出はインスタンス色の明度補正側で相殺する。
-    c.copy(rootColor).lerp(tipColor, Math.pow(t, 2.4));
+    // 指数を上げすぎると根元の濃青が毛軸の大半を占め、毛が寝る頭頂で
+    // 「濃紺の斑」として露出する。中腹からゆるやかに毛先色へ移行させる。
+    c.copy(rootColor).lerp(tipColor, Math.pow(t, 2.0));
     colors[i * 3] = c.r;
     colors[i * 3 + 1] = c.g;
     colors[i * 3 + 2] = c.b;
@@ -146,6 +174,14 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
   const quat = new THREE.Quaternion();
   const dummy = new THREE.Object3D();
   const tint = new THREE.Color();
+
+  const tufts: TuftData = {
+    px: new Float32Array(COUNT),
+    py: new Float32Array(COUNT),
+    pz: new Float32Array(COUNT),
+    ny: new Float32Array(COUNT),
+    faceT: new Float32Array(COUNT),
+  };
 
   let placed = 0;
   let guard = 0;
@@ -207,7 +243,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
       .multiplyScalar(0.3);
     // 上向き法線ほど追加で寝かせる。寝かせすぎると毛が倒れて根元の濃色が
     // 真上から露出し、頭頂だけ濃い斑に見えるため控えめに。
-    const crownDroop = Math.max(0, n.y) * 0.45;
+    const crownDroop = Math.max(0, n.y) * 0.35;
     // 長い差し毛ほど重力で強く垂れる（ウニ状の逆立ちを避ける）。
     const guardDroop = guardHair ? 0.5 : 0;
     dir
@@ -239,13 +275,119 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
       placed,
       tint.setRGB(v * (0.92 + 0.14 * fw), v * (0.97 + 0.09 * fw), v * 1.05),
     );
+    tufts.px[placed] = p.x;
+    tufts.py[placed] = p.y;
+    tufts.pz[placed] = p.z;
+    tufts.ny[placed] = n.y;
+    tufts.faceT[placed] = Math.min(1, faceT);
     placed++;
   }
   fur.count = placed;
   fur.instanceMatrix.needsUpdate = true;
   if (fur.instanceColor) fur.instanceColor.needsUpdate = true;
 
-  return fur;
+  return { fur, tufts };
+}
+
+// ---- 実写リファレンスによる毛束ティント -------------------------------------
+
+/** モデル座標の縦アンカー（展開テクスチャの行との対応付け）。 */
+const REF_Y_TOP = 2.27; // 頭頂 → row 0
+const REF_Y_NOSE = 1.94; // 鼻 → meta.noseRow
+const REF_Y_BOTTOM = -0.32; // 体の下端 → 最終行
+
+/**
+ * 公式ステッカー写真から生成した展開テクスチャ（行=高さ・列=シルエット
+ * 横断方向）を毛束ごとにサンプルし、インスタンス色として適用する。
+ * 実写の毛並みの色ムラ・陰影がそのままファーに乗る。
+ */
+function applyFurReferenceToInstances(
+  fur: THREE.InstancedMesh,
+  tufts: TuftData,
+  image: HTMLImageElement,
+  meta: FurRefMeta,
+): void {
+  const canvas = document.createElement("canvas");
+  canvas.width = meta.width;
+  canvas.height = meta.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.drawImage(image, 0, 0, meta.width, meta.height);
+  const data = ctx.getImageData(0, 0, meta.width, meta.height).data;
+
+  // 「見た目の体色 ≒ 毛先色」なので、写真画素 ÷ 毛先色 をティントにすると
+  // ファー外殻の色が写真の色に一致する。
+  const tipColor = new THREE.Color(FUR_TIP);
+  const tint = new THREE.Color();
+  const count = fur.count;
+
+  // 縦: 頭頂→鼻 / 鼻→体下端 の2区間ピースワイズ線形。
+  // （実物は鼻が頭頂のすぐ下にあり、モデルと縦比率が異なるため。）
+  const rowOf = (y: number): number => {
+    if (y >= REF_Y_NOSE) {
+      const t = (REF_Y_TOP - y) / (REF_Y_TOP - REF_Y_NOSE);
+      return THREE.MathUtils.clamp(t, 0, 1) * meta.noseRow;
+    }
+    const t = (REF_Y_NOSE - y) / (REF_Y_NOSE - REF_Y_BOTTOM);
+    return meta.noseRow + THREE.MathUtils.clamp(t, 0, 1) * (meta.height - 1 - meta.noseRow);
+  };
+
+  for (let i = 0; i < count; i++) {
+    // 横: 体軸まわりの角度 θ の sin を列に対応付ける（正射影と同じ写像）。
+    // テクスチャは左右対称化済みなので、背面は前面のミラーになる。
+    const theta = Math.atan2(tufts.px[i], tufts.pz[i]);
+    const u = 0.5 + 0.5 * Math.sin(theta);
+    const col = u * (meta.width - 1);
+    const row = rowOf(tufts.py[i]);
+
+    // バイリニアサンプル
+    const c0 = Math.floor(col);
+    const r0 = Math.floor(row);
+    const c1 = Math.min(meta.width - 1, c0 + 1);
+    const r1 = Math.min(meta.height - 1, r0 + 1);
+    const fc = col - c0;
+    const fr = row - r0;
+    let rr = 0;
+    let gg = 0;
+    let bb = 0;
+    for (const [ci, ri, w] of [
+      [c0, r0, (1 - fc) * (1 - fr)],
+      [c1, r0, fc * (1 - fr)],
+      [c0, r1, (1 - fc) * fr],
+      [c1, r1, fc * fr],
+    ] as const) {
+      const o = (ri * meta.width + ci) * 4;
+      rr += data[o] * w;
+      gg += data[o + 1] * w;
+      bb += data[o + 2] * w;
+    }
+
+    // 暗すぎる画素（毛の間の深い影）はそのまま使うと黒い斑点になるため、
+    // 明度の床を設けて持ち上げる（色相は保つ）。
+    const lum = (rr + gg + bb) / 3;
+    const FLOOR = 96;
+    if (lum < FLOOR && lum > 0) {
+      const k = FLOOR / lum;
+      rr *= k;
+      gg *= k;
+      bb *= k;
+    }
+
+    // ティント = 写真色 ÷ 毛先色。既存の微調整（明度ゆらぎ・頭頂/顔の
+    // 持ち上げ）は控えめに残す（3D側の根元露出はテクスチャに無い情報のため）。
+    // 頭頂は droop で毛が寝て根元（濃青）が真上に露出するため、
+    // 手続き版と同等以上に強く持ち上げないと濃紺の斑が出る。
+    let v = 0.95 + Math.random() * 0.1;
+    v *= 1 + 0.2 * tufts.faceT[i];
+    v *= 1 + 0.45 * Math.max(0, tufts.ny[i]);
+    tint.setRGB(
+      THREE.MathUtils.clamp((v * (rr / 255)) / tipColor.r, 0.25, 1.45),
+      THREE.MathUtils.clamp((v * (gg / 255)) / tipColor.g, 0.25, 1.45),
+      THREE.MathUtils.clamp((v * (bb / 255)) / tipColor.b, 0.25, 1.45),
+    );
+    fur.setColorAt(i, tint);
+  }
+  if (fur.instanceColor) fur.instanceColor.needsUpdate = true;
 }
 
 /**
@@ -452,7 +594,7 @@ export function createSunsunModel(): SunsunModelParts {
   root.add(body);
 
   // 体のファー（もこもこ）。visible の切り替えでツルッと版と比較できる。
-  const fur = buildFur(body);
+  const { fur, tufts } = buildFur(body);
   root.add(fur);
 
   // ---- 顔（まとめて軽く動かせるようグループ化） ----
@@ -515,7 +657,15 @@ export function createSunsunModel(): SunsunModelParts {
 
   root.add(legL, legR);
 
-  return { root, head, eyes: [eyeL, eyeR], mouth, arms: [armL, armR], fur };
+  return {
+    root,
+    head,
+    eyes: [eyeL, eyeR],
+    mouth,
+    arms: [armL, armR],
+    fur,
+    applyFurReference: (image, meta) => applyFurReferenceToInstances(fur, tufts, image, meta),
+  };
 }
 
 export const SUNSUN_COLORS = { SKY, SKY_LIGHT, EYE_WHITE, PUPIL, LIMB_DARK };

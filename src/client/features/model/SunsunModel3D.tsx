@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { createSunsunModel } from "./sunsunModel";
+import { createSunsunModel, type FurRefMeta } from "./sunsunModel";
 import type { PeriodKey } from "../talk/_utils/constants";
 
 // 時間帯ごとのステージの色味（トークUIと揃える）。
@@ -113,6 +113,23 @@ export function SunsunModel3D({
     const sunsun = createSunsunModel();
     scene.add(sunsun.root);
 
+    // 実写リファレンス（公式ステッカー写真由来）でファーの色ムラを実物に寄せる。
+    // ロード失敗時は手続き的なティントのまま表示する。
+    let disposed = false;
+    (async () => {
+      try {
+        const res = await fetch("/assets/model/fur-ref.json");
+        if (!res.ok) return;
+        const meta = (await res.json()) as FurRefMeta;
+        const image = new Image();
+        image.src = "/assets/model/fur-ref.png";
+        await image.decode();
+        if (!disposed) sunsun.applyFurReference(image, meta);
+      } catch {
+        // リファレンス無しでも動作に支障はない
+      }
+    })();
+
     // ---- コントロール ----
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 0.4, 0);
@@ -195,6 +212,7 @@ export function SunsunModel3D({
 
     // ---- クリーンアップ ----
     return () => {
+      disposed = true;
       cancelAnimationFrame(raf);
       observer.disconnect();
       controls.dispose();
