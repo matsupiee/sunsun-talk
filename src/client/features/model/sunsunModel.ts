@@ -19,7 +19,7 @@ import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.j
 const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
 const FUR_ROOT = "#2e72de"; // 毛束の根元〜中間（鮮やかな深いブルー）
-const FUR_TIP = "#b5dcfa"; // 毛束の毛先（明るい空色のチップ。白すぎない）
+const FUR_TIP = "#c5e3fc"; // 毛束の毛先（白っぽい空色のチップ）
 const SKIN_BASE = "#4c8be0"; // 毛の隙間から見える地肌（鮮やかなブルー）
 const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
 const PUPIL = "#141210"; // 黒目・鼻・口の黒
@@ -93,8 +93,8 @@ function buildBody(): THREE.Mesh {
 // ---- ファー（毛束）--------------------------------------------------------
 
 /** 顔パーツの位置（毛を避ける・短くする判定に使う）。 */
-const EYE_L_POS = new THREE.Vector3(0.155, 2.13, 0.24);
-const EYE_R_POS = new THREE.Vector3(-0.155, 2.17, 0.24);
+const EYE_L_POS = new THREE.Vector3(0.16, 2.14, 0.24);
+const EYE_R_POS = new THREE.Vector3(-0.16, 2.16, 0.24);
 const NOSE_POS = new THREE.Vector3(0, 1.94, 0.46);
 
 /**
@@ -117,7 +117,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
   for (let i = 0; i < pos.count; i++) {
     const t = THREE.MathUtils.clamp(pos.getY(i), 0, 1);
     // 白化は毛先寄りに限定しつつ、中間色は鮮やかな青を保つ。
-    c.copy(rootColor).lerp(tipColor, Math.pow(t, 2.8));
+    c.copy(rootColor).lerp(tipColor, Math.pow(t, 2.4));
     colors[i * 3] = c.r;
     colors[i * 3 + 1] = c.g;
     colors[i * 3 + 2] = c.b;
@@ -150,7 +150,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     // 目の球・鼻・口の輪郭ぎわ数ミリだけは毛を植えない（それ以外は頭頂まで生やす）。
     const dEyeL = p.distanceTo(EYE_L_POS);
     const dEyeR = p.distanceTo(EYE_R_POS);
-    if (dEyeL < 0.16 || dEyeR < 0.16) continue;
+    if (dEyeL < 0.17 || dEyeR < 0.17) continue;
     if (p.distanceTo(NOSE_POS) < 0.12) continue;
     // 口デカール（半幅0.16・半高0.085）よりひと回り狭い範囲だけ毛を避ける。
     // デカールが無毛域を完全に覆い隠し、外周の毛が縁に被さる。
@@ -239,7 +239,7 @@ function buildEye(side: 1 | -1): THREE.Group {
     emissive: new THREE.Color("#e9eef2"),
     emissiveIntensity: 0.35,
   });
-  const white = new THREE.Mesh(new THREE.SphereGeometry(0.19, 48, 48), whiteMat);
+  const white = new THREE.Mesh(new THREE.SphereGeometry(0.2, 48, 48), whiteMat);
   white.castShadow = true;
   group.add(white);
 
@@ -432,11 +432,11 @@ export function createSunsunModel(): SunsunModelParts {
   // 実物の愛嬌を出す。
   // 左右の見た目が揃うよう y 回転は付けない（黒円盤の見かけサイズが変わるため）。
   const eyeL = buildEye(1);
-  eyeL.position.set(0.155, 2.145, 0.24);
+  eyeL.position.set(0.16, 2.14, 0.24);
   eyeL.rotation.x = THREE.MathUtils.degToRad(20);
 
   const eyeR = buildEye(-1);
-  eyeR.position.set(-0.155, 2.155, 0.24);
+  eyeR.position.set(-0.16, 2.16, 0.24);
   eyeR.rotation.x = THREE.MathUtils.degToRad(20);
 
   head.add(eyeL, eyeR);
