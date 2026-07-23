@@ -150,7 +150,7 @@ function buildFur(body: THREE.Mesh): { fur: THREE.InstancedMesh; tufts: TuftData
     // 頭頂の根元露出はインスタンス色の明度補正側で相殺する。
     // 指数を上げすぎると根元の濃青が毛軸の大半を占め、毛が寝る頭頂で
     // 「濃紺の斑」として露出する。中腹からゆるやかに毛先色へ移行させる。
-    c.copy(rootColor).lerp(tipColor, Math.pow(t, 2.0));
+    c.copy(rootColor).lerp(tipColor, Math.pow(t, 1.75));
     colors[i * 3] = c.r;
     colors[i * 3 + 1] = c.g;
     colors[i * 3 + 2] = c.b;
@@ -219,8 +219,9 @@ function buildFur(body: THREE.Mesh): { fur: THREE.InstancedMesh; tufts: TuftData
     if (Math.abs(p.y - 1.755) < 0.2 && p.z > 0.1) lengthScale *= 0.8;
     // 口の直近リングはさらに短くして、毛が開口へ被らないようにする。
     if (Math.abs(p.y - 1.755) < 0.12 && p.z > 0.2) lengthScale *= 0.7;
-    // 頭頂は毛を長めにして地肌・根元の露出を埋める。
-    if (n.y > 0.4) lengthScale *= 1.35;
+    // 頭頂は毛をやや長めにして地肌の露出を埋める（長すぎると寝た毛軸の
+    // 根元色が真上に大きく露出して濃紺の斑になるため控えめに）。
+    if (n.y > 0.4) lengthScale *= 1.2;
 
     // 15% は長めの「差し毛」にして、輪郭を大ぶりに波打たせる。
     const guardHair = !nearFace && Math.random() < 0.12;
@@ -243,7 +244,7 @@ function buildFur(body: THREE.Mesh): { fur: THREE.InstancedMesh; tufts: TuftData
       .multiplyScalar(0.3);
     // 上向き法線ほど追加で寝かせる。寝かせすぎると毛が倒れて根元の濃色が
     // 真上から露出し、頭頂だけ濃い斑に見えるため控えめに。
-    const crownDroop = Math.max(0, n.y) * 0.35;
+    const crownDroop = Math.max(0, n.y) * 0.25;
     // 長い差し毛ほど重力で強く垂れる（ウニ状の逆立ちを避ける）。
     const guardDroop = guardHair ? 0.5 : 0;
     dir
@@ -337,8 +338,17 @@ function applyFurReferenceToInstances(
     // テクスチャは左右対称化済みなので、背面は前面のミラーになる。
     const theta = Math.atan2(tufts.px[i], tufts.pz[i]);
     const u = 0.5 + 0.5 * Math.sin(theta);
-    const col = u * (meta.width - 1);
-    const row = rowOf(tufts.py[i]);
+    // サンプル位置に小さなジッタを加え、列に沿った「縦筋」の帯を散らす。
+    const col = THREE.MathUtils.clamp(
+      u * (meta.width - 1) + (Math.random() - 0.5) * 3,
+      0,
+      meta.width - 1,
+    );
+    const row = THREE.MathUtils.clamp(
+      rowOf(tufts.py[i]) + (Math.random() - 0.5) * 2.4,
+      0,
+      meta.height - 1,
+    );
 
     // バイリニアサンプル
     const c0 = Math.floor(col);

@@ -137,6 +137,14 @@ for i in range(min(crown_limit, rows)):
     w = 0.85 * fade
     norm[i] = norm[i] * (1 - w) + bright_mean[None, :] * w
 
+# --- 彩度・明度ブースト ---
+# レンダリングでは 3D ライティングと毛先グラデーションを介すため、写真の
+# 実測より彩度・明度が半段沈む。実物の「明るいペリウィンクル」の第一印象に
+# 合わせ、リファレンス側で先に持ち上げておく。
+gray = norm.mean(axis=2, keepdims=True)
+norm = gray + (norm - gray) * 1.28  # 彩度 +28%
+norm = norm * 1.07  # 明度 +7%
+
 out = Image.fromarray(np.clip(norm, 0, 255).astype(np.uint8))
 out = out.filter(ImageFilter.GaussianBlur(0.6))
 out.save(f"{OUT_DIR}/fur-ref.png")
