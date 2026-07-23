@@ -39,25 +39,24 @@ function skinMaterial(color: string) {
 
 /** 水色のボディ（頭〜胴を 1 本の回転体でなめらかに繋いだヒョウタン形）。 */
 function buildBody(): THREE.Mesh {
-  // (半径, 高さ) の輪郭。下から上へ。頭を大きめの丸、胴は少し細めにして
-  // ボウリングピンのようなパペットのシルエットを作る。
+  // (半径, 高さ) の輪郭。下から上へ。実物は「丸い頭 + それより太いふっくら
+  // した胴」なので、胴（お腹）をいちばん広く、頭はまるいボール状にする。
   const profile: Array<[number, number]> = [
-    [0.02, -1.62],
-    [0.42, -1.58],
-    [0.72, -1.42],
-    [0.94, -1.12],
-    [1.08, -0.72],
-    [1.09, -0.28],
-    [1.02, 0.12],
-    [0.92, 0.42], // 頭と胴のあいだの軽いくびれ
-    [0.95, 0.66],
-    [1.06, 0.96],
-    [1.14, 1.2], // 頭のいちばん広いところ
-    [1.09, 1.44],
-    [0.9, 1.66],
-    [0.58, 1.84],
-    [0.28, 1.94],
-    [0.02, 1.98],
+    [0.02, -1.58],
+    [0.52, -1.54],
+    [0.9, -1.3],
+    [1.14, -0.94],
+    [1.24, -0.5], // お腹がいちばん広い
+    [1.22, -0.05],
+    [1.08, 0.38],
+    [0.95, 0.68], // 頭と胴のあいだの軽いくびれ
+    [1.0, 0.92],
+    [1.13, 1.18],
+    [1.18, 1.4], // 頭のいちばん広いところ（まるいボール）
+    [1.1, 1.64],
+    [0.88, 1.84],
+    [0.5, 2.0],
+    [0.02, 2.06],
   ];
 
   const points = profile.map(([r, y]) => new THREE.Vector2(r, y));
@@ -82,25 +81,26 @@ function buildEye(side: 1 | -1): THREE.Group {
     emissive: new THREE.Color("#e9eef2"),
     emissiveIntensity: 0.35,
   });
-  const white = new THREE.Mesh(new THREE.SphereGeometry(0.46, 48, 48), whiteMat);
+  // 白目は小さめのボール。実物の目は頭に対してそれほど大きくない。
+  const white = new THREE.Mesh(new THREE.SphereGeometry(0.34, 48, 48), whiteMat);
   white.castShadow = true;
   group.add(white);
 
-  // 黒目は白目の前面に少し飛び出させて球状に。少し内寄り＆下向きの
-  // 「ちょっと寄り目」で愛嬌のある表情にする。
+  // 黒目は白目の縁が少し残る程度まで大きく（実物は黒目が白目のほとんどを
+  // 占める）。前面に張り付けて正面を向かせる。
   const pupilMat = new THREE.MeshStandardMaterial({
     color: new THREE.Color(PUPIL),
-    roughness: 0.35,
+    roughness: 0.32,
     metalness: 0.0,
   });
-  const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.23, 40, 40), pupilMat);
-  pupil.position.set(-side * 0.05, -0.06, 0.4);
+  const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.24, 40, 40), pupilMat);
+  pupil.position.set(-side * 0.02, 0.02, 0.19);
   group.add(pupil);
 
   // 黒目のハイライト（プラスチックの目の反射）。
   const glintMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  const glint = new THREE.Mesh(new THREE.SphereGeometry(0.055, 20, 20), glintMat);
-  glint.position.set(-side * 0.05 + 0.07, 0.04, 0.58);
+  const glint = new THREE.Mesh(new THREE.SphereGeometry(0.05, 20, 20), glintMat);
+  glint.position.set(-side * 0.02 + 0.08, 0.1, 0.38);
   group.add(glint);
 
   return group;
@@ -118,18 +118,19 @@ function buildNose(): THREE.Mesh {
   return nose;
 }
 
-/** 大きく開いた黒い口。縦につぶした黒いお椀で「ぽっかり開いた穴」に見せる。 */
+/** 大きく開いた黒い口。横長・平たいマットな黒で「ぽっかり開いた穴」に見せる。 */
 function buildMouth(): THREE.Mesh {
   const mat = new THREE.MeshStandardMaterial({
     color: new THREE.Color(PUPIL),
-    roughness: 0.55,
+    // つや消しにして「プラスチックの黒いボール」に見えないようにする。
+    roughness: 0.9,
     metalness: 0.0,
     side: THREE.DoubleSide,
   });
-  // 半球を伏せて口内のくぼみを作る。
-  const geo = new THREE.SphereGeometry(0.34, 40, 40);
+  const geo = new THREE.SphereGeometry(0.3, 40, 40);
   const mouth = new THREE.Mesh(geo, mat);
-  mouth.scale.set(1.15, 0.92, 0.7);
+  // 縦横比を横長に、奥行きは浅くして「面に開いた穴」に近づける。
+  mouth.scale.set(1.3, 0.92, 0.5);
   return mouth;
 }
 
@@ -176,36 +177,39 @@ export function createSunsunModel(): SunsunModelParts {
   const head = new THREE.Group();
   root.add(head);
 
-  // 実物のように、頭のてっぺん寄りに 2 つの目をくっつけて乗せる。
+  // 実物のように、頭の前面・中央寄りに 2 つの目をほぼくっつけて配置する。
+  // 目・鼻・口を上寄りにまとめて「顔のかたまり」を作るのがポイント。
   const eyeL = buildEye(1);
-  eyeL.position.set(0.37, 1.74, 0.62);
-  eyeL.rotation.y = THREE.MathUtils.degToRad(-12);
-  eyeL.rotation.z = THREE.MathUtils.degToRad(6);
+  eyeL.position.set(0.28, 1.46, 0.78);
+  eyeL.rotation.y = THREE.MathUtils.degToRad(-16);
+  eyeL.rotation.x = THREE.MathUtils.degToRad(-6);
 
   const eyeR = buildEye(-1);
-  eyeR.position.set(-0.37, 1.76, 0.62);
-  eyeR.rotation.y = THREE.MathUtils.degToRad(12);
-  eyeR.rotation.z = THREE.MathUtils.degToRad(-8);
+  eyeR.position.set(-0.28, 1.47, 0.78);
+  eyeR.rotation.y = THREE.MathUtils.degToRad(16);
+  eyeR.rotation.x = THREE.MathUtils.degToRad(-6);
 
   head.add(eyeL, eyeR);
 
+  // 鼻は目のすぐ下、中央に。
   const nose = buildNose();
-  nose.position.set(0, 1.16, 1.12);
+  nose.position.set(0, 1.18, 1.08);
   head.add(nose);
 
+  // 口は鼻のすぐ下に。顔の中央〜やや下にまとめる。
   const mouth = buildMouth();
-  mouth.position.set(0, 0.74, 1.0);
+  mouth.position.set(0, 0.86, 0.92);
   head.add(mouth);
 
   // ---- 腕 ----
   const armL = buildArm(1);
-  armL.position.set(1.02, -0.1, 0.15);
-  armL.rotation.z = THREE.MathUtils.degToRad(24);
+  armL.position.set(1.16, -0.2, 0.12);
+  armL.rotation.z = THREE.MathUtils.degToRad(20);
   armL.rotation.x = THREE.MathUtils.degToRad(-8);
 
   const armR = buildArm(-1);
-  armR.position.set(-1.02, -0.1, 0.15);
-  armR.rotation.z = THREE.MathUtils.degToRad(-24);
+  armR.position.set(-1.16, -0.2, 0.12);
+  armR.rotation.z = THREE.MathUtils.degToRad(-20);
   armR.rotation.x = THREE.MathUtils.degToRad(-8);
 
   root.add(armL, armR);
