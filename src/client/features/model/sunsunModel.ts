@@ -18,7 +18,7 @@ import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.j
 // ---- パレット（実物の配色を参考に） ----------------------------------------
 const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
-const FUR_ROOT = "#6c8ad8"; // 毛束の根元（彩度のあるペリウィンクル。陰のコントラストを作る）
+const FUR_ROOT = "#7b93dd"; // 毛束の根元〜中間（彩度のあるペリウィンクル）
 const FUR_TIP = "#e8f1fe"; // 毛束の毛先（白に近い水色）
 const SKIN_BASE = "#8fafe8"; // 毛の隙間から見える地肌（暗く沈んでハゲに見えない明るさ）
 const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
@@ -116,7 +116,8 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
   const c = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
     const t = THREE.MathUtils.clamp(pos.getY(i), 0, 1);
-    c.copy(rootColor).lerp(tipColor, t);
+    // 白化は毛先だけに限定（根元〜中間はしっかり青いペリウィンクルを保つ）。
+    c.copy(rootColor).lerp(tipColor, Math.pow(t, 2.2));
     colors[i * 3] = c.r;
     colors[i * 3 + 1] = c.g;
     colors[i * 3 + 2] = c.b;
@@ -396,14 +397,16 @@ export function createSunsunModel(): SunsunModelParts {
 
   // ---- 長い腕（肩は筒の上から約 1/3 の側面。体側に沿ってまっすぐ垂らす） ----
   // ファーの外側に腕のラインが見えるよう、肩をやや外に出す。
+  // 腕はファーから離して外側へ垂らし、「腕」として読めるようにする
+  // （体に沿わせすぎると3/4視点で黒い裂け目に見える）。
   const armL = buildArm(1);
-  armL.position.set(0.5, 1.38, 0.1);
-  armL.rotation.z = THREE.MathUtils.degToRad(7);
+  armL.position.set(0.53, 1.38, 0.1);
+  armL.rotation.z = THREE.MathUtils.degToRad(13);
   armL.rotation.x = THREE.MathUtils.degToRad(-3);
 
   const armR = buildArm(-1);
-  armR.position.set(-0.5, 1.38, 0.1);
-  armR.rotation.z = THREE.MathUtils.degToRad(-7);
+  armR.position.set(-0.53, 1.38, 0.1);
+  armR.rotation.z = THREE.MathUtils.degToRad(-13);
   armR.rotation.x = THREE.MathUtils.degToRad(-3);
 
   root.add(armL, armR);
