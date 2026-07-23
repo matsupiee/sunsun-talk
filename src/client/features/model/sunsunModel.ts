@@ -19,8 +19,11 @@ import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.j
 const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
 const FUR_ROOT = "#2f6be6"; // 毛束の根元〜中間（鮮やかなコバルト寄りブルー）
-const FUR_TIP = "#d8ecff"; // 毛束の毛先（白っぽい空色のチップ）
-const SKIN_BASE = "#3f8ae8"; // 毛の隙間から見える地肌（鮮やかなブルー）
+// ファーの外殻はほぼ毛先で構成されるため「見た目の体色 ≒ 毛先色」。
+// 毛先を白にすると全体が退色したラベンダーに見えるので、明るいが
+// 明確に青いチップにする（白っぽさは明度ゆらぎで少量だけ乗る）。
+const FUR_TIP = "#b7d6fc"; // 毛束の毛先（明るい空色のチップ）
+const SKIN_BASE = "#6f9cf0"; // 毛の隙間から見える地肌（中間の明るいブルー）
 const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
 const PUPIL = "#141210"; // 黒目・鼻・口の黒
 const LIMB_DARK = "#121216"; // 黒に近い腕・脚・手足
@@ -119,7 +122,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     // 白化は毛先の2〜3割に限定し、中腹までは鮮やかな青を保つ
     // （指数が低いと全体が白く飛んでラベンダー/グレー寄りに見える）。
     // 頭頂の根元露出はインスタンス色の明度補正側で相殺する。
-    c.copy(rootColor).lerp(tipColor, Math.pow(t, 3.0));
+    c.copy(rootColor).lerp(tipColor, Math.pow(t, 2.4));
     colors[i * 3] = c.r;
     colors[i * 3 + 1] = c.g;
     colors[i * 3 + 2] = c.b;
@@ -361,10 +364,10 @@ function buildHand(side: 1 | -1): THREE.Group {
   for (let i = 0; i < 4; i++) {
     const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, fingerLens[i], 6, 12), mat);
     // 開きは控えめの扇。根元は互いにほぼ接し、先だけ軽く開く。
-    const fan = (i - 1.5) * 0.1;
+    const fan = (i - 1.5) * 0.13;
     finger.position.set((i - 1.5) * 0.155, -0.58 - fingerLens[i] * 0.08, 0);
     finger.rotation.z = -fan;
-    finger.scale.z = 0.38; // 断面を扁平に（丸棒でなく平リボンのフェルト感）
+    finger.scale.z = 0.3; // 断面を扁平に（丸棒でなく平リボンのフェルト感）
     finger.castShadow = true;
     group.add(finger);
   }
@@ -419,8 +422,9 @@ function buildLeg(side: 1 | -1): THREE.Group {
   // 大きく丸い靴のような足。前方主体に突き出し、軽い外股に。
   const foot = new THREE.Mesh(new THREE.SphereGeometry(0.2, 32, 32), mat);
   foot.scale.set(1.25, 0.95, 3.0);
-  foot.position.set(side * 0.03, -1.1, 0.4);
-  foot.rotation.y = side * 0.2;
+  // 内股に見えないよう左右間隔を空け、つま先をはっきり外向きに。
+  foot.position.set(side * 0.08, -1.1, 0.4);
+  foot.rotation.y = side * 0.3;
   foot.castShadow = true;
   group.add(foot);
 
