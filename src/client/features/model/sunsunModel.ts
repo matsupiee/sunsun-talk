@@ -150,8 +150,8 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     // 目の球・鼻・口の輪郭ぎわ数ミリだけは毛を植えない（それ以外は頭頂まで生やす）。
     const dEyeL = p.distanceTo(EYE_L_POS);
     const dEyeR = p.distanceTo(EYE_R_POS);
-    if (dEyeL < 0.17 || dEyeR < 0.17) continue;
-    if (p.distanceTo(NOSE_POS) < 0.12) continue;
+    if (dEyeL < 0.16 || dEyeR < 0.16) continue;
+    if (p.distanceTo(NOSE_POS) < 0.11) continue;
     // 口デカール（半幅0.16・半高0.085）よりひと回り狭い範囲だけ毛を避ける。
     // デカールが無毛域を完全に覆い隠し、外周の毛が縁に被さる。
     if (Math.abs(p.y - 1.71) < 0.045 && Math.abs(p.x) < 0.1 && p.z > 0.25) continue;
@@ -274,7 +274,7 @@ function buildNose(): THREE.Mesh {
     // 布張りなのでプラスチックほどつやを出さない。
     roughness: 0.55,
   });
-  mat.roughness = 0.9; // マットな布の質感（強いハイライトを出さない）
+  mat.roughness = 1.0; // 完全マットな布の質感（ハイライトを出さない）
   const nose = new THREE.Mesh(new THREE.SphereGeometry(0.115, 32, 32), mat);
   nose.scale.set(1.05, 1.0, 0.75);
   return nose;
@@ -321,7 +321,7 @@ function buildMouth(): THREE.Mesh {
 function buildHand(side: 1 | -1): THREE.Group {
   const group = new THREE.Group();
   const mat = skinMaterial(LIMB_DARK);
-  mat.roughness = 0.85;
+  mat.roughness = 0.95;
 
   // 実物の手は「一枚の平たい黒フェルトの手袋」。手のひらは角の無い
   // 丸みのある平板にし、指は根元同士が触れ合う間隔で深く食い込ませて
@@ -342,10 +342,10 @@ function buildHand(side: 1 | -1): THREE.Group {
   // 太く平たい 4 本指。隙間は狭く、根元はナックル板に食い込ませて連続させる。
   for (let i = 0; i < 4; i++) {
     const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.068, 0.6, 6, 12), mat);
-    const fan = (i - 1.5) * 0.1; // 控えめな開き
+    const fan = (i - 1.5) * 0.12; // 自然に開く
     finger.position.set((i - 1.5) * 0.122, -0.72, 0);
     finger.rotation.z = -fan;
-    finger.scale.z = 0.58; // 断面を扁平に（先端は丸く残す）
+    finger.scale.z = 0.5; // 断面を扁平に（フェルトの薄さ）
     finger.castShadow = true;
     group.add(finger);
   }
@@ -365,7 +365,7 @@ function buildHand(side: 1 | -1): THREE.Group {
 function buildArm(side: 1 | -1): THREE.Group {
   const group = new THREE.Group();
   const mat = skinMaterial(LIMB_DARK);
-  mat.roughness = 0.85;
+  mat.roughness = 0.95;
 
   // 細長い腕（全身の約半分の長さ・筒幅の約 1/6 の太さ）。
   const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 1.7, 20), mat);
@@ -388,7 +388,7 @@ function buildArm(side: 1 | -1): THREE.Group {
 function buildLeg(side: 1 | -1): THREE.Group {
   const group = new THREE.Group();
   const mat = skinMaterial(LIMB_DARK);
-  mat.roughness = 0.85;
+  mat.roughness = 0.95;
 
   // 脚は棒ではなく、ぬいぐるみらしい太さ（筒幅の約 1/4〜1/3）。
   const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.135, 0.15, 1.15, 24), mat);
