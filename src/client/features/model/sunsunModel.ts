@@ -18,8 +18,8 @@ import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.j
 // ---- パレット（実物の配色を参考に） ----------------------------------------
 const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
-const FUR_ROOT = "#3f7edb"; // 毛束の根元〜中間（鮮やかな深めのブルー）
-const FUR_TIP = "#a8d4f8"; // 毛束の毛先（明るい空色）
+const FUR_ROOT = "#3a79db"; // 毛束の根元〜中間（鮮やかな深めのブルー）
+const FUR_TIP = "#bfe0fb"; // 毛束の毛先（白っぽい空色のチップ）
 const SKIN_BASE = "#5f97e4"; // 毛の隙間から見える地肌（鮮やかなブルー）
 const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
 const PUPIL = "#141210"; // 黒目・鼻・口の黒
@@ -236,7 +236,7 @@ function buildEye(side: 1 | -1): THREE.Group {
     roughness: 0.6,
     metalness: 0.0,
   });
-  const irisDir = new THREE.Vector3(-side * 0.24, -0.24, 1).normalize();
+  const irisDir = new THREE.Vector3(-side * 0.18, -0.2, 1).normalize();
   const iris = new THREE.Mesh(new THREE.SphereGeometry(0.095, 40, 40), irisMat);
   iris.scale.set(1, 1, 0.16);
   iris.position.copy(irisDir).multiplyScalar(0.185);
@@ -284,8 +284,8 @@ function buildMouth(): THREE.Mesh {
   // 単位円 → 半幅0.16・半高0.085 の小さな楕円にし、x を弧長として筒面に巻き付ける。
   // 地肌(≒0.458)より上・毛の垂れ(≒0.5)より中央は上。縁の沈み込みは
   // 毛の垂れ境界までに留め、視点が回っても口が欠けないようにする。
-  const R_CENTER = 0.52;
-  const R_EDGE = 0.5;
+  const R_CENTER = 0.515;
+  const R_EDGE = 0.495;
   const geo = new THREE.CircleGeometry(1, 48);
   const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
   for (let i = 0; i < posAttr.count; i++) {
@@ -308,29 +308,34 @@ function buildHand(side: 1 | -1): THREE.Group {
   const mat = skinMaterial(LIMB_DARK);
   mat.roughness = 0.85;
 
-  // 実物の手は「一枚の平たい黒フェルトの手袋」。手首から幅が広がる
-  // 平たい面に、長い指が根元でつながって連続する（棒の寄せ集めにしない）。
-  const palm = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.12, 0.42, 24), mat);
-  palm.scale.z = 0.32; // 平たく
-  palm.position.y = -0.21;
+  // 実物の手は「一枚の平たい黒フェルトの手袋」。手のひらは角の無い
+  // 丸みのある平板にし、指は根元同士が触れ合う間隔で深く食い込ませて
+  // 全体がひとつながりのシルエットに見えるようにする。
+  const palm = new THREE.Mesh(new THREE.SphereGeometry(0.25, 32, 32), mat);
+  palm.scale.set(1.0, 1.15, 0.3);
+  palm.position.y = -0.26;
   palm.castShadow = true;
   group.add(palm);
+  // 手首→手のひらをつなぐくさび。
+  const wrist = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.2, 0.24, 20), mat);
+  wrist.scale.z = 0.4;
+  wrist.position.y = -0.1;
+  group.add(wrist);
 
-  // 長い 4 本指。根元を手のひら面に食い込ませて一枚につなげ、緩く開く。
+  // 長い 4 本指。根元同士が触れる間隔＋深い食い込みで一枚につなげる。
   for (let i = 0; i < 4; i++) {
-    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.44, 6, 12), mat);
-    const fan = (i - 1.5) * 0.12; // 緩く開く
-    finger.position.set((i - 1.5) * 0.118, -0.52, 0);
-    finger.position.x += Math.sin(fan) * 0.1;
+    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.42, 6, 12), mat);
+    const fan = (i - 1.5) * 0.08; // ごく緩い開き
+    finger.position.set((i - 1.5) * 0.105, -0.5, 0);
     finger.rotation.z = -fan;
     finger.scale.z = 0.62; // 指も平たく
     finger.castShadow = true;
     group.add(finger);
   }
 
-  // 親指は大きく横へ開く（実物は親指の分離が目立つ）。
+  // 親指だけははっきり分離して大きく横へ。
   const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.062, 0.3, 6, 12), mat);
-  thumb.position.set(side * 0.26, -0.28, 0);
+  thumb.position.set(side * 0.28, -0.3, 0);
   thumb.rotation.z = side * 0.9;
   thumb.scale.z = 0.62;
   thumb.castShadow = true;
@@ -408,14 +413,13 @@ export function createSunsunModel(): SunsunModelParts {
   // 黒目が正面（カメラ側）を向くよう少し前へ傾ける。
   // 大きめのピンポン玉の目をほぼ接するように。高さは少し非対称にして
   // 実物の愛嬌を出す。
+  // 左右の見た目が揃うよう y 回転は付けない（黒円盤の見かけサイズが変わるため）。
   const eyeL = buildEye(1);
-  eyeL.position.set(0.155, 2.13, 0.24);
-  eyeL.rotation.y = THREE.MathUtils.degToRad(-2);
+  eyeL.position.set(0.155, 2.14, 0.24);
   eyeL.rotation.x = THREE.MathUtils.degToRad(20);
 
   const eyeR = buildEye(-1);
-  eyeR.position.set(-0.155, 2.17, 0.24);
-  eyeR.rotation.y = THREE.MathUtils.degToRad(2);
+  eyeR.position.set(-0.155, 2.16, 0.24);
   eyeR.rotation.x = THREE.MathUtils.degToRad(20);
 
   head.add(eyeL, eyeR);
