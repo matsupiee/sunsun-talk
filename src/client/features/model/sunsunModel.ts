@@ -18,9 +18,9 @@ import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.j
 // ---- パレット（実物の配色を参考に） ----------------------------------------
 const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
-const FUR_ROOT = "#6f8de0"; // 毛束の根元〜中間（彩度の高いペリウィンクル）
-const FUR_TIP = "#cfe0fb"; // 毛束の毛先（明るい水色。白くしすぎない）
-const SKIN_BASE = "#8fafe8"; // 毛の隙間から見える地肌（暗く沈んでハゲに見えない明るさ）
+const FUR_ROOT = "#4e86dd"; // 毛束の根元〜中間（鮮やかな深めのブルー）
+const FUR_TIP = "#b5daf9"; // 毛束の毛先（明るい空色）
+const SKIN_BASE = "#6ba0e6"; // 毛の隙間から見える地肌（鮮やかなブルー）
 const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
 const PUPIL = "#141210"; // 黒目・鼻・口の黒
 const LIMB_DARK = "#121216"; // 黒に近い腕・脚・手足
@@ -93,9 +93,9 @@ function buildBody(): THREE.Mesh {
 // ---- ファー（毛束）--------------------------------------------------------
 
 /** 顔パーツの位置（毛を避ける・短くする判定に使う）。 */
-const EYE_L_POS = new THREE.Vector3(0.125, 2.15, 0.22);
-const EYE_R_POS = new THREE.Vector3(-0.125, 2.16, 0.22);
-const NOSE_POS = new THREE.Vector3(0, 1.9, 0.48);
+const EYE_L_POS = new THREE.Vector3(0.155, 2.13, 0.24);
+const EYE_R_POS = new THREE.Vector3(-0.155, 2.17, 0.24);
+const NOSE_POS = new THREE.Vector3(0, 1.9, 0.46);
 
 /**
  * 体表面に数万本の毛束（先細りの小さな錐）を InstancedMesh で植える。
@@ -150,11 +150,11 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     // 目の球・鼻・口の輪郭ぎわ数ミリだけは毛を植えない（それ以外は頭頂まで生やす）。
     const dEyeL = p.distanceTo(EYE_L_POS);
     const dEyeR = p.distanceTo(EYE_R_POS);
-    if (dEyeL < 0.155 || dEyeR < 0.155) continue;
-    if (p.distanceTo(NOSE_POS) < 0.11) continue;
-    // 口デカール（半幅0.32・半高0.16）よりひと回り狭い範囲だけ毛を避ける。
+    if (dEyeL < 0.19 || dEyeR < 0.19) continue;
+    if (p.distanceTo(NOSE_POS) < 0.13) continue;
+    // 口デカール（半幅0.16・半高0.085）よりひと回り狭い範囲だけ毛を避ける。
     // デカールが無毛域を完全に覆い隠し、外周の毛が縁に被さる。
-    if (Math.abs(p.y - 1.68) < 0.13 && Math.abs(p.x) < 0.27 && p.z > 0.25) continue;
+    if (Math.abs(p.y - 1.68) < 0.06 && Math.abs(p.x) < 0.12 && p.z > 0.25) continue;
 
     // 顔の正面上部は短毛にして、目・鼻・口が読めるようにする（無毛地帯は作らない）。
     const nearFace = p.y > 1.45 && p.z > 0.05;
@@ -163,7 +163,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     if (dEyeL < 0.3 || dEyeR < 0.3) lengthScale *= 0.45;
     // 口の周囲リングもやや短毛にして、毛が開口に垂れて口を隠さないようにする
     // （短くしすぎると刈り込み跡に見えるので控えめに）。
-    if (Math.abs(p.y - 1.68) < 0.26 && p.z > 0.1) lengthScale *= 0.7;
+    if (Math.abs(p.y - 1.68) < 0.2 && p.z > 0.1) lengthScale *= 0.7;
 
     // 15% は長めの「差し毛」にして、輪郭を大ぶりに波打たせる。
     const guardHair = !nearFace && Math.random() < 0.12;
@@ -210,51 +210,59 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
   return fur;
 }
 
-/** 頭のてっぺんに乗る小さなグーグリーアイ（白目＋小さめの黒目）。 */
+/**
+ * 頭のてっぺんに乗るピンポン玉状の目。
+ * 実物は白い球に「平らな黒い円」が印刷のように付き、その内側に
+ * 小さな白い点が1つ入る（球状の黒目ではない）。視線はやや内側・下寄り。
+ */
 function buildEye(side: 1 | -1): THREE.Group {
   const group = new THREE.Group();
 
   const whiteMat = new THREE.MeshStandardMaterial({
     color: new THREE.Color(EYE_WHITE),
-    roughness: 0.35,
+    roughness: 0.25,
     metalness: 0.0,
     // つやのある目が影に沈んで灰色に見えないよう、わずかに自発光。
     emissive: new THREE.Color("#e9eef2"),
     emissiveIntensity: 0.35,
   });
-  const white = new THREE.Mesh(new THREE.SphereGeometry(0.16, 48, 48), whiteMat);
-  white.scale.set(1, 1.05, 1);
+  const white = new THREE.Mesh(new THREE.SphereGeometry(0.19, 48, 48), whiteMat);
   white.castShadow = true;
   group.add(white);
 
-  // 黒目は白目に対して小さめの黒点。
-  const pupilMat = new THREE.MeshStandardMaterial({
+  // 黒目＝平らな黒い円盤（強くつぶした球）。やや内側・下寄りに貼る。
+  const irisMat = new THREE.MeshStandardMaterial({
     color: new THREE.Color(PUPIL),
-    roughness: 0.32,
+    roughness: 0.6,
     metalness: 0.0,
   });
-  const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.06, 40, 40), pupilMat);
-  // 白目の中央（わずかに内側寄り）に置く。
-  pupil.position.set(-side * 0.014, -0.008, 0.14);
-  group.add(pupil);
+  const irisDir = new THREE.Vector3(-side * 0.24, -0.24, 1).normalize();
+  const iris = new THREE.Mesh(new THREE.SphereGeometry(0.095, 40, 40), irisMat);
+  iris.scale.set(1, 1, 0.16);
+  iris.position.copy(irisDir).multiplyScalar(0.185);
+  iris.lookAt(irisDir.clone().multiplyScalar(2));
+  group.add(iris);
 
-  // 黒目のハイライト。ごく小さな点ひとつ。
-  const glintMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  const glint = new THREE.Mesh(new THREE.SphereGeometry(0.016, 16, 16), glintMat);
-  glint.position.set(-side * 0.012 + 0.024, 0.045, 0.19);
-  group.add(glint);
+  // 黒円の内側に入る小さな白い点（フラット）。
+  const dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.028, 20, 20), dotMat);
+  dot.scale.set(1, 1, 0.2);
+  dot.position.copy(irisDir).multiplyScalar(0.2);
+  dot.lookAt(irisDir.clone().multiplyScalar(2));
+  group.add(dot);
 
   return group;
 }
 
-/** 小さな黒い丸鼻。目のすぐ下・中央。 */
+/** 黒い布張りボタン状の丸鼻。目のすぐ下・目と目の間に接する。 */
 function buildNose(): THREE.Mesh {
   const mat = new THREE.MeshStandardMaterial({
     color: new THREE.Color(PUPIL),
-    roughness: 0.3,
+    // 布張りなのでプラスチックほどつやを出さない。
+    roughness: 0.55,
   });
-  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.085, 32, 32), mat);
-  nose.scale.set(1.1, 1.0, 0.7);
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.105, 32, 32), mat);
+  nose.scale.set(1.05, 1.0, 0.75);
   return nose;
 }
 
@@ -271,9 +279,8 @@ function buildMouth(): THREE.Mesh {
     metalness: 0.0,
     side: THREE.DoubleSide,
   });
-  // 単位円 → 半幅0.32・半高0.16 の楕円にし、x を弧長として筒面に巻き付ける。
-  // この高さの体表半径は ≒0.458。中央は毛の垂れに隠れないよう外へ出し、
-  // 縁は体内へ沈むレンズ状にして、横から見ても縁が浮かないようにする。
+  // 実物の口は小さく控えめ（幅は筒幅の約1/4以下）。
+  // 単位円 → 半幅0.16・半高0.085 の小さな楕円にし、x を弧長として筒面に巻き付ける。
   // 地肌(≒0.458)より上・毛の垂れ(≒0.5)より中央は上。縁の沈み込みは
   // 毛の垂れ境界までに留め、視点が回っても口が欠けないようにする。
   const R_CENTER = 0.52;
@@ -283,8 +290,8 @@ function buildMouth(): THREE.Mesh {
   for (let i = 0; i < posAttr.count; i++) {
     const ux = posAttr.getX(i);
     const uy = posAttr.getY(i);
-    const ex = ux * 0.32;
-    const ey = uy * 0.16;
+    const ex = ux * 0.16;
+    const ey = uy * 0.085;
     const edge = Math.min(1, ux * ux + uy * uy); // 中心0→縁1
     const r = R_CENTER - (R_CENTER - R_EDGE) * edge;
     const theta = ex / r;
@@ -300,27 +307,31 @@ function buildHand(side: 1 | -1): THREE.Group {
   const mat = skinMaterial(LIMB_DARK);
   mat.roughness = 0.85;
 
-  // 手のひらは丸い円盤ではなく、縦に長い平たいフェルト形。
-  const palm = new THREE.Mesh(new THREE.SphereGeometry(0.17, 32, 32), mat);
-  palm.scale.set(1.0, 1.25, 0.45);
+  // 実物の手は「一枚の平たい黒フェルトの手袋」。丸い手のひらの塊は無く、
+  // 手首から幅が広がる平たいくさび形に、長い指がつながる。
+  const palm = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.09, 0.34, 24), mat);
+  palm.scale.z = 0.3; // 平たく
+  palm.position.y = -0.17;
   palm.castShadow = true;
   group.add(palm);
 
-  // 長い 4 本指をほぼ平行に（大きく扇に開かない）。根元は手のひらに食い込ませる。
+  // 長くしなやかな 4 本指を、扇状にはっきり開く（実物のポーズに合わせる）。
   for (let i = 0; i < 4; i++) {
-    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.05, 0.42, 6, 12), mat);
-    const fan = (i - 1.5) * 0.02; // ほぼ平行
-    finger.position.set((i - 1.5) * 0.098, -0.38, 0);
+    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.048, 0.5, 6, 12), mat);
+    const fan = (i - 1.5) * 0.17; // しっかり開く
+    finger.position.set((i - 1.5) * 0.105, -0.56, 0);
+    finger.position.x += Math.sin(fan) * 0.12;
     finger.rotation.z = -fan;
-    finger.scale.z = 0.8; // 指も平たく
+    finger.scale.z = 0.7; // 指も平たく
     finger.castShadow = true;
     group.add(finger);
   }
 
-  // 親指はやや斜め下へ（真横に張らない）。
-  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.2, 6, 12), mat);
-  thumb.position.set(side * 0.2, -0.16, 0);
-  thumb.rotation.z = side * 0.5;
+  // 親指は大きく横へ開く（実物は親指の分離が目立つ）。
+  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.052, 0.32, 6, 12), mat);
+  thumb.position.set(side * 0.24, -0.3, 0);
+  thumb.rotation.z = side * 0.95;
+  thumb.scale.z = 0.7;
   thumb.castShadow = true;
   group.add(thumb);
 
@@ -339,13 +350,12 @@ function buildArm(side: 1 | -1): THREE.Group {
   upper.castShadow = true;
   group.add(upper);
 
+  // 手の原点は手首（腕の末端）。そこから手袋が下に伸びる。
   const hand = buildHand(side);
-  hand.position.y = -1.82;
-  // 手は腕の延長で自然に垂らす。手のひらは体側へ向け、正面からは
-  // 手の甲〜側面が見えるようにする（前へ突き出さない）。
-  hand.rotation.y = -side * 0.5;
-  // フェルトの手袋らしい存在感が出るよう少し大きめに。
-  hand.scale.setScalar(1.15);
+  hand.position.y = -1.68;
+  // 手のひらはやや体側へ。正面からも開いた指が見える程度に留める。
+  hand.rotation.y = -side * 0.35;
+  hand.scale.setScalar(1.05);
   group.add(hand);
 
   return group;
@@ -395,13 +405,15 @@ export function createSunsunModel(): SunsunModelParts {
   // 小さな白目 2 つを頭のてっぺんに、ほぼ接するように乗せる。
   // 頭頂のドームに半分沈めて密着させ、互いにほぼ接するまで寄せる。
   // 黒目が正面（カメラ側）を向くよう少し前へ傾ける。
+  // 大きめのピンポン玉の目をほぼ接するように。高さは少し非対称にして
+  // 実物の愛嬌を出す。
   const eyeL = buildEye(1);
-  eyeL.position.set(0.125, 2.15, 0.22);
+  eyeL.position.set(0.155, 2.13, 0.24);
   eyeL.rotation.y = THREE.MathUtils.degToRad(-2);
   eyeL.rotation.x = THREE.MathUtils.degToRad(20);
 
   const eyeR = buildEye(-1);
-  eyeR.position.set(-0.125, 2.16, 0.22);
+  eyeR.position.set(-0.155, 2.17, 0.24);
   eyeR.rotation.y = THREE.MathUtils.degToRad(2);
   eyeR.rotation.x = THREE.MathUtils.degToRad(20);
 
@@ -409,7 +421,7 @@ export function createSunsunModel(): SunsunModelParts {
 
   // 鼻は目のすぐ下・中央。ファーに埋もれないよう毛先より前へ出す。
   const nose = buildNose();
-  nose.position.set(0, 1.9, 0.48);
+  nose.position.set(0, 1.9, 0.46);
   head.add(nose);
 
   // 口は鼻の下、横に広く浅い開口。毛に埋もれず、突き出しすぎない位置に。
