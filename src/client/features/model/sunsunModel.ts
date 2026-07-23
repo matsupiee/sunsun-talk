@@ -219,11 +219,17 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     // 短毛（顔まわり）は根元の暗色が支配的になるため明るめに補正する。
     let v = 0.88 + Math.random() * 0.12;
     // 短毛ほど根元の暗色が支配的になるため、顔の度合いに応じて滑らかに明るく。
-    v *= 1 + 0.3 * Math.min(1, faceT);
+    v *= 1 + 0.35 * Math.min(1, faceT);
     // 頭頂（上向き法線）は真上から根元が見えて暗く沈みやすいので少し持ち上げる。
     v *= 1 + 0.25 * Math.max(0, n.y);
     // 赤成分を下げて青の彩度を保つ（グレー寄りに washed out させない）。
-    fur.setColorAt(placed, tint.setRGB(v * 0.92, v * 0.97, v * 1.05));
+    // ただし顔の短毛は根元の濃青が支配的で「顔だけ濃いパッチ」に見えるため、
+    // 顔の度合いに応じて乗算色を白側へ寄せ、体側の毛先色と揃える。
+    const fw = Math.min(1, faceT);
+    fur.setColorAt(
+      placed,
+      tint.setRGB(v * (0.92 + 0.14 * fw), v * (0.97 + 0.09 * fw), v * 1.05),
+    );
     placed++;
   }
   fur.count = placed;
