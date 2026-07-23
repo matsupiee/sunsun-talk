@@ -18,7 +18,7 @@ import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.j
 // ---- パレット（実物の配色を参考に） ----------------------------------------
 const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
-const FUR_ROOT = "#2e72de"; // 毛束の根元〜中間（鮮やかな深いブルー）
+const FUR_ROOT = "#2c6fdd"; // 毛束の根元〜中間（鮮やかな深いコバルト寄りブルー）
 const FUR_TIP = "#c5e3fc"; // 毛束の毛先（白っぽい空色のチップ）
 const SKIN_BASE = "#4c8be0"; // 毛の隙間から見える地肌（鮮やかなブルー）
 const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
@@ -150,7 +150,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     // 目の球・鼻・口の輪郭ぎわ数ミリだけは毛を植えない（それ以外は頭頂まで生やす）。
     const dEyeL = p.distanceTo(EYE_L_POS);
     const dEyeR = p.distanceTo(EYE_R_POS);
-    if (dEyeL < 0.16 || dEyeR < 0.16) continue;
+    if (dEyeL < 0.145 || dEyeR < 0.145) continue;
     if (p.distanceTo(NOSE_POS) < 0.11) continue;
     // 口デカール（半幅0.16・半高0.085）よりひと回り狭い範囲だけ毛を避ける。
     // デカールが無毛域を完全に覆い隠し、外周の毛が縁に被さる。
@@ -164,8 +164,9 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
       (0.8 + Math.random() * 0.4);
     const nearFace = faceT > 0.5;
     let lengthScale = 1.0 - 0.38 * Math.min(1, faceT);
-    // 目のすぐ近くはさらに短毛にして、白目が毛の上に半分埋まって見えるようにする。
-    if (dEyeL < 0.3 || dEyeR < 0.3) lengthScale *= 0.45;
+    // 目のすぐ近く（前面側のみ）はやや短毛にして、白目が毛に半分埋まって
+    // 見えるようにする。頭頂の後ろ側まで短くすると地肌が露出するので絞る。
+    if ((dEyeL < 0.3 || dEyeR < 0.3) && p.z > 0.12) lengthScale *= 0.6;
     // 口の周囲リングもやや短毛にして、毛が開口に垂れて口を隠さないようにする
     // （短くしすぎると刈り込み跡に見えるので控えめに）。
     if (Math.abs(p.y - 1.72) < 0.2 && p.z > 0.1) lengthScale *= 0.7;
@@ -339,12 +340,12 @@ function buildHand(side: 1 | -1): THREE.Group {
   knuckle.castShadow = true;
   group.add(knuckle);
 
-  // 太く平たい 4 本指。隙間は狭く、根元はナックル板に食い込ませて連続させる。
+  // 太く平たい 4 本指。実際の手のように指ごとに長さを変えて有機的に。
+  const fingerLens = [0.52, 0.6, 0.62, 0.5]; // 人差し指〜小指相当
   for (let i = 0; i < 4; i++) {
-    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.066, 0.62, 6, 12), mat);
+    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, fingerLens[i], 6, 12), mat);
     const fan = (i - 1.5) * 0.12; // 自然に開く
-    // 根元の食い込みを浅くして、指と指のあいだに実際の隙間を見せる。
-    finger.position.set((i - 1.5) * 0.128, -0.68, 0);
+    finger.position.set((i - 1.5) * 0.124, -0.66 - fingerLens[i] * 0.08, 0);
     finger.rotation.z = -fan;
     finger.scale.z = 0.5; // 断面を扁平に（フェルトの薄さ）
     finger.castShadow = true;
