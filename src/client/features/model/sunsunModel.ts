@@ -18,8 +18,8 @@ import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.j
 // ---- パレット（実物の配色を参考に） ----------------------------------------
 const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
-const FUR_ROOT = "#7288d8"; // 毛束の根元〜中間（彩度のあるペリウィンクル）
-const FUR_TIP = "#e8f1fe"; // 毛束の毛先（白に近い水色）
+const FUR_ROOT = "#6f8de0"; // 毛束の根元〜中間（彩度の高いペリウィンクル）
+const FUR_TIP = "#cfe0fb"; // 毛束の毛先（明るい水色。白くしすぎない）
 const SKIN_BASE = "#8fafe8"; // 毛の隙間から見える地肌（暗く沈んでハゲに見えない明るさ）
 const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
 const PUPIL = "#141210"; // 黒目・鼻・口の黒
@@ -195,8 +195,9 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     fur.setMatrixAt(placed, dummy.matrix);
 
     // 毛束ごとの明るさのゆらぎ（下振れ広めで毛の谷間の陰を作る）。
+    // わずかに青へ寄せて、強い光でも水色の印象が飛ばないようにする。
     const v = 0.82 + Math.random() * 0.18;
-    fur.setColorAt(placed, tint.setRGB(v, v, v));
+    fur.setColorAt(placed, tint.setRGB(v * 0.95, v * 0.98, v * 1.03));
     placed++;
   }
   fur.count = placed;
@@ -255,9 +256,9 @@ function buildNose(): THREE.Mesh {
 }
 
 /**
- * 横に広い浅い口。体表（この高さの半径 ≒0.44）と同じ曲率で湾曲する
- * 薄い球面パッチとして表現し、くちばし状に突き出さないようにする。
- * 球の中心を体の軸上（口の高さ）に置くこと。しゃべる時は scale.y で縦に開く。
+ * 横に広い浅い口。楕円のデカールを体表（この高さの半径 ≒0.44）に沿って
+ * 湾曲させたもので、長方形やくちばし状に見えないようにする。
+ * メッシュの原点は体の軸上（口の高さ）に置くこと。しゃべる時は scale.y で縦に開く。
  */
 function buildMouth(): THREE.Mesh {
   const mat = new THREE.MeshStandardMaterial({
@@ -267,8 +268,17 @@ function buildMouth(): THREE.Mesh {
     metalness: 0.0,
     side: THREE.DoubleSide,
   });
-  // 幅 ≒0.56・高さ ≒0.27 の前面パッチ（+z 向き）。
-  const geo = new THREE.SphereGeometry(0.452, 48, 24, Math.PI / 2 - 0.62, 1.24, Math.PI / 2 - 0.3, 0.6);
+  // 単位円 → 半幅0.29・半高0.14 の楕円にし、x を弧長として筒面に巻き付ける。
+  const R = 0.452;
+  const geo = new THREE.CircleGeometry(1, 48);
+  const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
+  for (let i = 0; i < posAttr.count; i++) {
+    const ex = posAttr.getX(i) * 0.29;
+    const ey = posAttr.getY(i) * 0.14;
+    const theta = ex / R;
+    posAttr.setXYZ(i, R * Math.sin(theta), ey, R * Math.cos(theta));
+  }
+  geo.computeVertexNormals();
   return new THREE.Mesh(geo, mat);
 }
 
