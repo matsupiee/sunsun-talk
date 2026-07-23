@@ -18,8 +18,8 @@ import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.j
 // ---- パレット（実物の配色を参考に） ----------------------------------------
 const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
-const FUR_ROOT = "#1c6fe8"; // 毛束の根元〜中間（鮮やかな深いコバルト寄りブルー）
-const FUR_TIP = "#bce0fd"; // 毛束の毛先（白っぽい空色のチップ）
+const FUR_ROOT = "#1e5fe2"; // 毛束の根元〜中間（鮮やかな深いコバルト寄りブルー）
+const FUR_TIP = "#cfe6ff"; // 毛束の毛先（白っぽい空色のチップ）
 const SKIN_BASE = "#3f8ae8"; // 毛の隙間から見える地肌（鮮やかなブルー）
 const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
 const PUPIL = "#141210"; // 黒目・鼻・口の黒
@@ -277,12 +277,11 @@ function buildEye(side: 1 | -1): THREE.Group {
 
 /** 黒い布張りボタン状の丸鼻。目のすぐ下・目と目の間に接する。 */
 function buildNose(): THREE.Mesh {
-  const mat = new THREE.MeshStandardMaterial({
+  // 布張りボタンは鏡面反射がほぼ無い。Standard は roughness 1 でも広い
+  // スペキュラが残って「光沢球」に見えるため、純拡散の Lambert を使う。
+  const mat = new THREE.MeshLambertMaterial({
     color: new THREE.Color(PUPIL),
-    // 布張りなのでプラスチックほどつやを出さない。
-    roughness: 0.55,
   });
-  mat.roughness = 1.0; // 完全マットな布の質感（ハイライトを出さない）
   const nose = new THREE.Mesh(new THREE.SphereGeometry(0.115, 32, 32), mat);
   nose.scale.set(1.05, 1.0, 0.75);
   return nose;
@@ -335,14 +334,14 @@ function buildHand(side: 1 | -1): THREE.Group {
   // 丸みのある平板にし、指は根元同士が触れ合う間隔で深く食い込ませて
   // 全体がひとつながりのシルエットに見えるようにする。
   // 手首から幅が広がる平たいくさび（フェルトの手袋の土台）。
-  const wedge = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.22, 0.38, 24), mat);
+  const wedge = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.26, 0.38, 24), mat);
   wedge.scale.z = 0.26;
   wedge.position.y = -0.19;
   wedge.castShadow = true;
   group.add(wedge);
   // ナックル部分の幅広の平板。指の根元をここへ連続させる。
   const knuckle = new THREE.Mesh(new THREE.SphereGeometry(0.22, 32, 32), mat);
-  knuckle.scale.set(1.12, 0.55, 0.14);
+  knuckle.scale.set(1.28, 0.55, 0.14);
   knuckle.position.y = -0.4;
   knuckle.castShadow = true;
   group.add(knuckle);
@@ -351,10 +350,11 @@ function buildHand(side: 1 | -1): THREE.Group {
   // 実物写真の「長い指が軽く開く」印象に合わせ、長め＋やや細め＋広めの放射。
   const fingerLens = [0.68, 0.78, 0.8, 0.65]; // 人差し指〜小指相当
   for (let i = 0; i < 4; i++) {
-    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.066, fingerLens[i], 6, 12), mat);
+    // 細いと熊手状に見えるため、フェルトらしい厚みのある太さにする。
+    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.082, fingerLens[i], 6, 12), mat);
     // 開きすぎると熊手状に見えるので、根元は寄せて先だけ軽く開く。
     const fan = (i - 1.5) * 0.12;
-    finger.position.set((i - 1.5) * 0.125, -0.66 - fingerLens[i] * 0.08, 0);
+    finger.position.set((i - 1.5) * 0.145, -0.66 - fingerLens[i] * 0.08, 0);
     finger.rotation.z = -fan;
     finger.scale.z = 0.5; // 断面を扁平に（フェルトの薄さ）
     finger.castShadow = true;
@@ -362,7 +362,7 @@ function buildHand(side: 1 | -1): THREE.Group {
   }
 
   // 親指は長めにして、手のひらからはっきり分岐させる。
-  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.48, 6, 12), mat);
+  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.48, 6, 12), mat);
   thumb.position.set(side * 0.29, -0.34, 0);
   thumb.rotation.z = side * 0.8;
   thumb.scale.z = 0.5;
