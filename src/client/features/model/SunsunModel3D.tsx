@@ -69,8 +69,8 @@ export function SunsunModel3D({
 
     // ---- ライティング（つるっとした立体感が出るように） ----
     // 全体を持ち上げる環境光。水色と白目が影で沈まないよう強めに。
-    // ファーの陰影（青い影）が残るよう環境光は控えめに。
-    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+    // ファーの陰影を残しつつ、影が濁った紺に沈まない程度の環境光。
+    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambient);
 
     const hemi = new THREE.HemisphereLight(0xffffff, 0xbfd6e6, 0.7);
