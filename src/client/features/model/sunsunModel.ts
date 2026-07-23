@@ -152,17 +152,18 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     const dEyeR = p.distanceTo(EYE_R_POS);
     if (dEyeL < 0.155 || dEyeR < 0.155) continue;
     if (p.distanceTo(NOSE_POS) < 0.11) continue;
-    // 口デカール（半幅0.32・半高0.16）よりわずかに狭い範囲だけ毛を避ける。
-    // デカールが無毛域を覆い隠しつつ、外周の毛が縁にちょうど被さる。
-    if (Math.abs(p.y - 1.68) < 0.145 && Math.abs(p.x) < 0.3 && p.z > 0.2) continue;
+    // 口デカール（半幅0.32・半高0.16）よりひと回り狭い範囲だけ毛を避ける。
+    // デカールが無毛域を完全に覆い隠し、外周の毛が縁に被さる。
+    if (Math.abs(p.y - 1.68) < 0.13 && Math.abs(p.x) < 0.27 && p.z > 0.25) continue;
 
     // 顔の正面上部は短毛にして、目・鼻・口が読めるようにする（無毛地帯は作らない）。
     const nearFace = p.y > 1.45 && p.z > 0.05;
     let lengthScale = nearFace ? 0.55 : 1.0;
     // 目のすぐ近くはさらに短毛にして、白目が毛の上に半分埋まって見えるようにする。
     if (dEyeL < 0.3 || dEyeR < 0.3) lengthScale *= 0.45;
-    // 口の周囲リングも短毛にして、毛が開口に垂れて口を隠さないようにする。
-    if (Math.abs(p.y - 1.68) < 0.26 && p.z > 0.1) lengthScale *= 0.55;
+    // 口の周囲リングもやや短毛にして、毛が開口に垂れて口を隠さないようにする
+    // （短くしすぎると刈り込み跡に見えるので控えめに）。
+    if (Math.abs(p.y - 1.68) < 0.26 && p.z > 0.1) lengthScale *= 0.7;
 
     // 15% は長めの「差し毛」にして、輪郭を大ぶりに波打たせる。
     const guardHair = !nearFace && Math.random() < 0.12;
