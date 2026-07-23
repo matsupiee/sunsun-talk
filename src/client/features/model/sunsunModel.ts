@@ -351,9 +351,10 @@ function buildHand(side: 1 | -1): THREE.Group {
   // 実物写真の「長い指が軽く開く」印象に合わせ、長め＋やや細め＋広めの放射。
   const fingerLens = [0.68, 0.78, 0.8, 0.65]; // 人差し指〜小指相当
   for (let i = 0; i < 4; i++) {
-    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.062, fingerLens[i], 6, 12), mat);
-    const fan = (i - 1.5) * 0.16; // 自然に開く
-    finger.position.set((i - 1.5) * 0.13, -0.66 - fingerLens[i] * 0.08, 0);
+    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.066, fingerLens[i], 6, 12), mat);
+    // 開きすぎると熊手状に見えるので、根元は寄せて先だけ軽く開く。
+    const fan = (i - 1.5) * 0.12;
+    finger.position.set((i - 1.5) * 0.125, -0.66 - fingerLens[i] * 0.08, 0);
     finger.rotation.z = -fan;
     finger.scale.z = 0.5; // 断面を扁平に（フェルトの薄さ）
     finger.castShadow = true;
