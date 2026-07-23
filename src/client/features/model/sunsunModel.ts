@@ -18,7 +18,7 @@ import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.j
 // ---- パレット（実物の配色を参考に） ----------------------------------------
 const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
-const FUR_ROOT = "#2f6be6"; // 毛束の根元〜中間（鮮やかなコバルト寄りブルー）
+const FUR_ROOT = "#2b63ea"; // 毛束の根元〜中間（鮮やかなコバルト寄りブルー）
 // ファーの外殻はほぼ毛先で構成されるため「見た目の体色 ≒ 毛先色」。
 // 毛先を白にすると全体が退色したラベンダーに見えるので、明るいが
 // 明確に青いチップにする（白っぽさは明度ゆらぎで少量だけ乗る）。
@@ -353,9 +353,10 @@ function buildHand(side: 1 | -1): THREE.Group {
   wedge.castShadow = true;
   group.add(wedge);
   // ナックル部分の幅広の平板。指の根元をここへ連続させる。
+  // 縦にも広げて、指の根元スリットの背景透けをこの板で塞ぐ。
   const knuckle = new THREE.Mesh(new THREE.SphereGeometry(0.22, 32, 32), mat);
-  knuckle.scale.set(1.28, 0.55, 0.14);
-  knuckle.position.y = -0.4;
+  knuckle.scale.set(1.28, 0.8, 0.14);
+  knuckle.position.y = -0.42;
   knuckle.castShadow = true;
   group.add(knuckle);
 
@@ -364,10 +365,10 @@ function buildHand(side: 1 | -1): THREE.Group {
   // 手全体が「切れ込みの入った一枚のフェルト」として読めるようにする。
   const fingerLens = [0.84, 0.96, 0.98, 0.82]; // 人差し指〜小指相当（掌より指が長い）
   for (let i = 0; i < 4; i++) {
-    // 太いとソーセージ束に見えるため、細め＋指間の隙間で1本ずつ独立させる。
-    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.072, fingerLens[i], 6, 12), mat);
-    const fan = (i - 1.5) * 0.15;
-    finger.position.set((i - 1.5) * 0.155, -0.58 - fingerLens[i] * 0.08, 0);
+    // 根元は互いに接し、先端だけ切れ込みで分かれる「一枚フェルトの手袋」。
+    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, fingerLens[i], 6, 12), mat);
+    const fan = (i - 1.5) * 0.09;
+    finger.position.set((i - 1.5) * 0.15, -0.52 - fingerLens[i] * 0.08, 0);
     finger.rotation.z = -fan;
     finger.scale.z = 0.28; // 断面を扁平に（丸棒でなく平リボンのフェルト感）
     finger.castShadow = true;
