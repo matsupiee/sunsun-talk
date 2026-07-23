@@ -18,7 +18,7 @@ import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.j
 // ---- パレット（実物の配色を参考に） ----------------------------------------
 const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
-const FUR_ROOT = "#2f72dd"; // 毛束の根元〜中間（鮮やかな深いブルー）
+const FUR_ROOT = "#3577de"; // 毛束の根元〜中間（鮮やかな深いブルー）
 const FUR_TIP = "#c5e3fc"; // 毛束の毛先（白っぽい空色のチップ）
 const SKIN_BASE = "#4c8be0"; // 毛の隙間から見える地肌（鮮やかなブルー）
 const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
@@ -169,9 +169,10 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
 
     // 15% は長めの「差し毛」にして、輪郭を大ぶりに波打たせる。
     const guardHair = !nearFace && Math.random() < 0.12;
-    // 針状に見えないよう、基本の毛は短め・太めに。
+    // 細めの毛を密に重ねて柔らかい質感にする（太い毛は硬く見える）。
     const len = (0.11 + Math.random() * 0.13) * lengthScale * (guardHair ? 1.6 : 1.0);
-    const thickness = (0.028 + Math.random() * 0.016) * (guardHair ? 1.25 : 1.0);
+    let thickness = (0.023 + Math.random() * 0.014) * (guardHair ? 1.25 : 1.0);
+    if (nearFace) thickness *= 0.8; // 顔まわりはさらに細く柔らかく
 
     // 毛流れ: 法線方向を基本に下へ垂らし、位置に応じたうねりで数本単位の
     // 「房」のまとまりを作る（完全ランダムだと針山に見えるため）。
@@ -205,7 +206,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     // わずかに青へ寄せて、強い光でも水色の印象が飛ばないようにする。
     // 短毛（顔まわり）は根元の暗色が支配的になるため明るめに補正する。
     let v = 0.88 + Math.random() * 0.12;
-    if (lengthScale < 0.75) v *= 1.18;
+    if (lengthScale < 0.75) v *= 1.28;
     fur.setColorAt(placed, tint.setRGB(v * 0.95, v * 0.98, v * 1.03));
     placed++;
   }
@@ -334,9 +335,9 @@ function buildHand(side: 1 | -1): THREE.Group {
 
   // 太く平たい 4 本指。隙間は狭く、根元はナックル板に食い込ませて連続させる。
   for (let i = 0; i < 4; i++) {
-    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.062, 0.6, 6, 12), mat);
+    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.068, 0.6, 6, 12), mat);
     const fan = (i - 1.5) * 0.08; // 控えめな開き
-    finger.position.set((i - 1.5) * 0.126, -0.72, 0);
+    finger.position.set((i - 1.5) * 0.122, -0.72, 0);
     finger.rotation.z = -fan;
     finger.scale.z = 0.58; // 断面を扁平に（先端は丸く残す）
     finger.castShadow = true;
