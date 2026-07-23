@@ -18,7 +18,7 @@ import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.j
 // ---- パレット（実物の配色を参考に） ----------------------------------------
 const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
-const FUR_ROOT = "#3d7ce2"; // 毛束の根元〜中間（明るく鮮やかなブルー）
+const FUR_ROOT = "#2f72dd"; // 毛束の根元〜中間（鮮やかな深いブルー）
 const FUR_TIP = "#cde7fc"; // 毛束の毛先（白っぽい空色のチップ）
 const SKIN_BASE = "#4c8be0"; // 毛の隙間から見える地肌（鮮やかなブルー）
 const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
@@ -56,10 +56,10 @@ function buildBody(): THREE.Mesh {
   const profile: Array<[number, number]> = [
     [0.02, -0.32],
     [0.24, -0.3],
-    [0.38, -0.22],
-    [0.45, -0.02],
-    [0.47, 0.3],
-    [0.48, 0.7], // ほぼ一定の太さ
+    [0.37, -0.22],
+    [0.44, -0.02],
+    [0.46, 0.3],
+    [0.47, 0.7], // ほぼ一定の太さ
     [0.48, 1.1],
     [0.47, 1.5],
     [0.45, 1.8],
@@ -154,7 +154,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     if (p.distanceTo(NOSE_POS) < 0.12) continue;
     // 口デカール（半幅0.16・半高0.085）よりひと回り狭い範囲だけ毛を避ける。
     // デカールが無毛域を完全に覆い隠し、外周の毛が縁に被さる。
-    if (Math.abs(p.y - 1.72) < 0.055 && Math.abs(p.x) < 0.12 && p.z > 0.25) continue;
+    if (Math.abs(p.y - 1.71) < 0.045 && Math.abs(p.x) < 0.1 && p.z > 0.25) continue;
 
     // 顔の正面上部は短毛にして、目・鼻・口が読めるようにする（無毛地帯は作らない）。
     const nearFace = p.y > 1.45 && p.z > 0.05;
@@ -292,7 +292,9 @@ function buildMouth(): THREE.Mesh {
   const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
   for (let i = 0; i < posAttr.count; i++) {
     const ux = posAttr.getX(i);
-    const uy = posAttr.getY(i);
+    let uy = posAttr.getY(i);
+    // 上半分をつぶして「軽く開いた口」の浅いアーチ形にする。
+    if (uy > 0) uy *= 0.55;
     const ex = ux * 0.115;
     const ey = uy * 0.055;
     const edge = Math.min(1, ux * ux + uy * uy); // 中心0→縁1
@@ -314,9 +316,9 @@ function buildHand(side: 1 | -1): THREE.Group {
   // 丸みのある平板にし、指は根元同士が触れ合う間隔で深く食い込ませて
   // 全体がひとつながりのシルエットに見えるようにする。
   // 手のひらは小さめ・薄めにして、長い指が主役になるようにする。
-  const palm = new THREE.Mesh(new THREE.SphereGeometry(0.22, 32, 32), mat);
-  palm.scale.set(1.05, 0.95, 0.13);
-  palm.position.y = -0.24;
+  const palm = new THREE.Mesh(new THREE.SphereGeometry(0.19, 32, 32), mat);
+  palm.scale.set(0.95, 0.9, 0.13);
+  palm.position.y = -0.22;
   palm.castShadow = true;
   group.add(palm);
   // 手首→手のひらをつなぐくさび。
@@ -327,9 +329,9 @@ function buildHand(side: 1 | -1): THREE.Group {
 
   // 長くしなやかな 4 本指。根元同士が触れる間隔＋深い食い込みで一枚に。
   for (let i = 0; i < 4; i++) {
-    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.054, 0.66, 6, 12), mat);
-    const fan = (i - 1.5) * 0.12; // 自然な開き
-    finger.position.set((i - 1.5) * 0.1, -0.62, 0);
+    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.052, 0.66, 6, 12), mat);
+    const fan = (i - 1.5) * 0.14; // 根元から分かれて見える開き
+    finger.position.set((i - 1.5) * 0.115, -0.6, 0);
     finger.rotation.z = -fan;
     finger.scale.z = 0.55; // 指も平たく
     finger.castShadow = true;
