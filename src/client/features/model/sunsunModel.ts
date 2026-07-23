@@ -18,8 +18,8 @@ import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.j
 // ---- パレット（実物の配色を参考に） ----------------------------------------
 const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
-const FUR_ROOT = "#3b6fd8"; // 毛束の根元〜中間（鮮やかなコバルト寄りブルー）
-const FUR_TIP = "#d6e8ff"; // 毛束の毛先（白っぽい空色のチップ）
+const FUR_ROOT = "#2f6be6"; // 毛束の根元〜中間（鮮やかなコバルト寄りブルー）
+const FUR_TIP = "#cde6ff"; // 毛束の毛先（白っぽい空色のチップ）
 const SKIN_BASE = "#3f8ae8"; // 毛の隙間から見える地肌（鮮やかなブルー）
 const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
 const PUPIL = "#141210"; // 黒目・鼻・口の黒
@@ -174,6 +174,8 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     if (Math.abs(p.y - 1.75) < 0.2 && p.z > 0.1) lengthScale *= 0.7;
     // 口の直近リングはさらに短くして、毛が開口へ被らないようにする。
     if (Math.abs(p.y - 1.75) < 0.12 && p.z > 0.2) lengthScale *= 0.55;
+    // 頭頂は毛を少し長くして地肌・根元の露出を埋める。
+    if (n.y > 0.5) lengthScale *= 1.15;
 
     // 15% は長めの「差し毛」にして、輪郭を大ぶりに波打たせる。
     const guardHair = !nearFace && Math.random() < 0.12;
@@ -196,7 +198,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
       .multiplyScalar(0.4);
     // 上向き法線ほど追加で寝かせる。寝かせすぎると毛が倒れて根元の濃色が
     // 真上から露出し、頭頂だけ濃い斑に見えるため控えめに。
-    const crownDroop = Math.max(0, n.y) * 0.6;
+    const crownDroop = Math.max(0, n.y) * 0.45;
     // 長い差し毛ほど重力で強く垂れる（ウニ状の逆立ちを避ける）。
     const guardDroop = guardHair ? 0.5 : 0;
     dir
@@ -219,7 +221,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     // 短毛ほど根元の暗色が支配的になるため、顔の度合いに応じて滑らかに明るく。
     v *= 1 + 0.3 * Math.min(1, faceT);
     // 頭頂（上向き法線）は真上から根元が見えて暗く沈みやすいので少し持ち上げる。
-    v *= 1 + 0.15 * Math.max(0, n.y);
+    v *= 1 + 0.25 * Math.max(0, n.y);
     // 赤成分を下げて青の彩度を保つ（グレー寄りに washed out させない）。
     fur.setColorAt(placed, tint.setRGB(v * 0.92, v * 0.97, v * 1.05));
     placed++;
@@ -257,8 +259,8 @@ function buildEye(side: 1 | -1): THREE.Group {
     roughness: 0.6,
     metalness: 0.0,
   });
-  const irisDir = new THREE.Vector3(-side * 0.26, -0.33, 1).normalize();
-  const iris = new THREE.Mesh(new THREE.SphereGeometry(0.095, 40, 40), irisMat);
+  const irisDir = new THREE.Vector3(-side * 0.3, -0.36, 1).normalize();
+  const iris = new THREE.Mesh(new THREE.SphereGeometry(0.082, 40, 40), irisMat);
   iris.scale.set(1, 1, 0.16);
   iris.position.copy(irisDir).multiplyScalar(0.185);
   iris.lookAt(irisDir.clone().multiplyScalar(2));
@@ -353,8 +355,8 @@ function buildHand(side: 1 | -1): THREE.Group {
     // 細いと熊手状に見えるため、フェルトらしい厚みのある太さにする。
     const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.082, fingerLens[i], 6, 12), mat);
     // 開きすぎると熊手状に見えるので、根元は寄せて先だけ軽く開く。
-    const fan = (i - 1.5) * 0.12;
-    finger.position.set((i - 1.5) * 0.145, -0.66 - fingerLens[i] * 0.08, 0);
+    const fan = (i - 1.5) * 0.15;
+    finger.position.set((i - 1.5) * 0.15, -0.66 - fingerLens[i] * 0.08, 0);
     finger.rotation.z = -fan;
     finger.scale.z = 0.42; // 断面を扁平に（丸棒でなく平リボンのフェルト感）
     finger.castShadow = true;
