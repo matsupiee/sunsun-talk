@@ -19,7 +19,7 @@ import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.j
 const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
 const FUR_ROOT = "#2f72dd"; // 毛束の根元〜中間（鮮やかな深いブルー）
-const FUR_TIP = "#cde7fc"; // 毛束の毛先（白っぽい空色のチップ）
+const FUR_TIP = "#c5e3fc"; // 毛束の毛先（白っぽい空色のチップ）
 const SKIN_BASE = "#4c8be0"; // 毛の隙間から見える地肌（鮮やかなブルー）
 const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
 const PUPIL = "#141210"; // 黒目・鼻・口の黒
@@ -186,9 +186,11 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
       )
       .multiplyScalar(0.4);
     const crownDroop = Math.max(0, n.y) * 0.85; // 上向き法線ほど追加で寝かせる
+    // 2割の毛は垂れを弱めて外へ広げ、ふわっとした輪郭を作る。
+    const fluffOut = Math.random() < 0.2 ? 0.6 : 1.0;
     dir
       .copy(n)
-      .addScaledVector(down, 1.35 + crownDroop + Math.random() * 0.4)
+      .addScaledVector(down, (1.35 + crownDroop + Math.random() * 0.4) * fluffOut)
       .add(jitter)
       .normalize();
     quat.setFromUnitVectors(up, dir);
@@ -265,7 +267,7 @@ function buildNose(): THREE.Mesh {
     // 布張りなのでプラスチックほどつやを出さない。
     roughness: 0.55,
   });
-  mat.roughness = 0.78; // マットな布の質感
+  mat.roughness = 0.9; // マットな布の質感（強いハイライトを出さない）
   const nose = new THREE.Mesh(new THREE.SphereGeometry(0.115, 32, 32), mat);
   nose.scale.set(1.05, 1.0, 0.75);
   return nose;
@@ -389,8 +391,8 @@ function buildLeg(side: 1 | -1): THREE.Group {
 
   // 大きく丸い靴のような足。前方主体に突き出し、軽い外股に。
   const foot = new THREE.Mesh(new THREE.SphereGeometry(0.2, 32, 32), mat);
-  foot.scale.set(1.25, 0.95, 2.8);
-  foot.position.set(side * 0.03, -1.1, 0.36);
+  foot.scale.set(1.25, 0.95, 3.0);
+  foot.position.set(side * 0.03, -1.1, 0.4);
   foot.rotation.y = side * 0.2;
   foot.castShadow = true;
   group.add(foot);
