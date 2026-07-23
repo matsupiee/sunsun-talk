@@ -55,12 +55,12 @@ function buildBody(): THREE.Mesh {
   // 太さはほぼ一定のまっすぐなチューブで、上端だけ丸いドーム。
   const profile: Array<[number, number]> = [
     [0.02, -0.32],
-    [0.24, -0.3],
-    [0.37, -0.22],
-    [0.44, -0.02],
+    [0.25, -0.3],
+    [0.39, -0.22],
+    [0.45, -0.02],
     [0.46, 0.3],
-    [0.47, 0.7], // ほぼ一定の太さ
-    [0.48, 1.1],
+    [0.465, 0.7], // ほぼ一定の太さ
+    [0.47, 1.1],
     [0.47, 1.5],
     [0.45, 1.8],
     [0.41, 2.0],
@@ -199,9 +199,11 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     dummy.updateMatrix();
     fur.setMatrixAt(placed, dummy.matrix);
 
-    // 毛束ごとの明るさのゆらぎ（下振れ広めで毛の谷間の陰を作る）。
+    // 毛束ごとの明るさのゆらぎ（ムラは控えめにして斑点ノイズを避ける）。
     // わずかに青へ寄せて、強い光でも水色の印象が飛ばないようにする。
-    const v = 0.82 + Math.random() * 0.18;
+    // 短毛（顔まわり）は根元の暗色が支配的になるため明るめに補正する。
+    let v = 0.88 + Math.random() * 0.12;
+    if (lengthScale < 0.75) v *= 1.18;
     fur.setColorAt(placed, tint.setRGB(v * 0.95, v * 0.98, v * 1.03));
     placed++;
   }
@@ -292,11 +294,11 @@ function buildMouth(): THREE.Mesh {
   const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
   for (let i = 0; i < posAttr.count; i++) {
     const ux = posAttr.getX(i);
-    let uy = posAttr.getY(i);
-    // 上半分をつぶして「軽く開いた口」の浅いアーチ形にする。
-    if (uy > 0) uy *= 0.55;
+    const uy = posAttr.getY(i);
     const ex = ux * 0.115;
-    const ey = uy * 0.055;
+    // 上縁が中央でわずかに凹む「軽く開いた曲線状の開口」にする。
+    let ey = uy * 0.055;
+    if (uy > 0) ey = uy * 0.03 - (1 - ux * ux) * 0.014;
     const edge = Math.min(1, ux * ux + uy * uy); // 中心0→縁1
     const r = R_CENTER - (R_CENTER - R_EDGE) * edge;
     const theta = ex / r;
@@ -334,7 +336,7 @@ function buildHand(side: 1 | -1): THREE.Group {
     const fan = (i - 1.5) * 0.08; // 控えめな開き
     finger.position.set((i - 1.5) * 0.126, -0.72, 0);
     finger.rotation.z = -fan;
-    finger.scale.z = 0.5; // 断面を扁平に
+    finger.scale.z = 0.58; // 断面を扁平に（先端は丸く残す）
     finger.castShadow = true;
     group.add(finger);
   }
