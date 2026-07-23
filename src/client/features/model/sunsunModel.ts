@@ -152,6 +152,10 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
   while (placed < COUNT && guard++ < COUNT * 40) {
     sampler.sample(p, n);
 
+    // 頭頂ドームは真上から見ると毛の間の地肌が最も目立つため、
+    // 頭頂以外のサンプルを一部棄却して相対的に頭頂の植毛密度を上げる。
+    if (n.y < 0.35 && Math.random() < 0.22) continue;
+
     // 目の球・鼻・口の輪郭ぎわ数ミリだけは毛を植えない（それ以外は頭頂まで生やす）。
     const dEyeL = p.distanceTo(EYE_L_POS);
     const dEyeR = p.distanceTo(EYE_R_POS);
@@ -178,7 +182,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     // 口の直近リングはさらに短くして、毛が開口へ被らないようにする。
     if (Math.abs(p.y - 1.755) < 0.12 && p.z > 0.2) lengthScale *= 0.7;
     // 頭頂は毛を長めにして地肌・根元の露出を埋める。
-    if (n.y > 0.4) lengthScale *= 1.3;
+    if (n.y > 0.4) lengthScale *= 1.35;
 
     // 15% は長めの「差し毛」にして、輪郭を大ぶりに波打たせる。
     const guardHair = !nearFace && Math.random() < 0.12;
