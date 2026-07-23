@@ -18,7 +18,7 @@ import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.j
 // ---- パレット（実物の配色を参考に） ----------------------------------------
 const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
-const FUR_ROOT = "#7b93dd"; // 毛束の根元〜中間（彩度のあるペリウィンクル）
+const FUR_ROOT = "#7288d8"; // 毛束の根元〜中間（彩度のあるペリウィンクル）
 const FUR_TIP = "#e8f1fe"; // 毛束の毛先（白に近い水色）
 const SKIN_BASE = "#8fafe8"; // 毛の隙間から見える地肌（暗く沈んでハゲに見えない明るさ）
 const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
@@ -116,8 +116,8 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
   const c = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
     const t = THREE.MathUtils.clamp(pos.getY(i), 0, 1);
-    // 白化は毛先だけに限定（根元〜中間はしっかり青いペリウィンクルを保つ）。
-    c.copy(rootColor).lerp(tipColor, Math.pow(t, 2.2));
+    // 白化は毛先の先端2割程度に限定（根元〜中間はしっかり青いペリウィンクルを保つ）。
+    c.copy(rootColor).lerp(tipColor, Math.pow(t, 3.0));
     colors[i * 3] = c.r;
     colors[i * 3 + 1] = c.g;
     colors[i * 3 + 2] = c.b;
@@ -193,7 +193,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     fur.setMatrixAt(placed, dummy.matrix);
 
     // 毛束ごとの明るさのゆらぎ（下振れ広めで毛の谷間の陰を作る）。
-    const v = 0.85 + Math.random() * 0.2;
+    const v = 0.82 + Math.random() * 0.18;
     fur.setColorAt(placed, tint.setRGB(v, v, v));
     placed++;
   }
