@@ -117,7 +117,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
   for (let i = 0; i < pos.count; i++) {
     const t = THREE.MathUtils.clamp(pos.getY(i), 0, 1);
     // 白化は毛先寄りに限定しつつ、中間色は鮮やかな青を保つ。
-    c.copy(rootColor).lerp(tipColor, Math.pow(t, 2.4));
+    c.copy(rootColor).lerp(tipColor, Math.pow(t, 2.6));
     colors[i * 3] = c.r;
     colors[i * 3 + 1] = c.g;
     colors[i * 3 + 2] = c.b;
@@ -188,7 +188,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     const crownDroop = Math.max(0, n.y) * 0.85; // 上向き法線ほど追加で寝かせる
     dir
       .copy(n)
-      .addScaledVector(down, 1.2 + crownDroop + Math.random() * 0.4)
+      .addScaledVector(down, 1.35 + crownDroop + Math.random() * 0.4)
       .add(jitter)
       .normalize();
     quat.setFromUnitVectors(up, dir);
@@ -315,34 +315,35 @@ function buildHand(side: 1 | -1): THREE.Group {
   // 実物の手は「一枚の平たい黒フェルトの手袋」。手のひらは角の無い
   // 丸みのある平板にし、指は根元同士が触れ合う間隔で深く食い込ませて
   // 全体がひとつながりのシルエットに見えるようにする。
-  // 手のひらは小さめ・薄めにして、長い指が主役になるようにする。
-  const palm = new THREE.Mesh(new THREE.SphereGeometry(0.19, 32, 32), mat);
-  palm.scale.set(0.95, 0.9, 0.13);
-  palm.position.y = -0.22;
-  palm.castShadow = true;
-  group.add(palm);
-  // 手首→手のひらをつなぐくさび。
-  const wrist = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.2, 0.24, 20), mat);
-  wrist.scale.z = 0.35;
-  wrist.position.y = -0.08;
-  group.add(wrist);
+  // 手首から幅が広がる平たいくさび（フェルトの手袋の土台）。
+  const wedge = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.22, 0.38, 24), mat);
+  wedge.scale.z = 0.3;
+  wedge.position.y = -0.19;
+  wedge.castShadow = true;
+  group.add(wedge);
+  // ナックル部分の幅広の平板。指の根元をここへ連続させる。
+  const knuckle = new THREE.Mesh(new THREE.SphereGeometry(0.22, 32, 32), mat);
+  knuckle.scale.set(1.12, 0.55, 0.14);
+  knuckle.position.y = -0.4;
+  knuckle.castShadow = true;
+  group.add(knuckle);
 
-  // 長くしなやかな 4 本指。根元同士が触れる間隔＋深い食い込みで一枚に。
+  // 太く平たい 4 本指。隙間は狭く、根元はナックル板に食い込ませて連続させる。
   for (let i = 0; i < 4; i++) {
-    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.052, 0.66, 6, 12), mat);
-    const fan = (i - 1.5) * 0.14; // 根元から分かれて見える開き
-    finger.position.set((i - 1.5) * 0.115, -0.6, 0);
+    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.062, 0.6, 6, 12), mat);
+    const fan = (i - 1.5) * 0.08; // 控えめな開き
+    finger.position.set((i - 1.5) * 0.126, -0.72, 0);
     finger.rotation.z = -fan;
-    finger.scale.z = 0.55; // 指も平たく
+    finger.scale.z = 0.5; // 断面を扁平に
     finger.castShadow = true;
     group.add(finger);
   }
 
   // 親指だけははっきり分離して大きく横へ。
-  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.38, 6, 12), mat);
-  thumb.position.set(side * 0.29, -0.32, 0);
-  thumb.rotation.z = side * 0.85;
-  thumb.scale.z = 0.55;
+  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.064, 0.34, 6, 12), mat);
+  thumb.position.set(side * 0.27, -0.36, 0);
+  thumb.rotation.z = side * 0.8;
+  thumb.scale.z = 0.5;
   thumb.castShadow = true;
   group.add(thumb);
 
