@@ -64,7 +64,7 @@ export function SunsunModel3D({
 
     // ---- ライティング（つるっとした立体感が出るように） ----
     // 全体を持ち上げる環境光。水色と白目が影で沈まないよう強めに。
-    const ambient = new THREE.AmbientLight(0xffffff, 0.55);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.65);
     scene.add(ambient);
 
     const hemi = new THREE.HemisphereLight(0xffffff, 0xbfd6e6, 0.7);
@@ -97,7 +97,8 @@ export function SunsunModel3D({
       new THREE.ShadowMaterial({ opacity: 0.22 }),
     );
     ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -1.75;
+    // 足の裏が接地する高さ。
+    ground.position.y = -1.52;
     ground.receiveShadow = true;
     scene.add(ground);
 
@@ -140,9 +141,9 @@ export function SunsunModel3D({
       raf = requestAnimationFrame(tick);
       const t = clock.getElapsedTime();
 
-      // 呼吸するような上下のゆれ。
-      sunsun.root.position.y = Math.sin(t * 1.4) * 0.05;
-      sunsun.root.rotation.z = Math.sin(t * 0.9) * 0.015;
+      // 呼吸するような上下のゆれ（立ち姿なので控えめに、足が浮かない程度）。
+      sunsun.root.position.y = Math.sin(t * 1.4) * 0.015;
+      sunsun.root.rotation.z = Math.sin(t * 0.9) * 0.012;
 
       // 頭を少しかしげる。
       sunsun.head.rotation.z = Math.sin(t * 0.8 + 0.5) * 0.03;
