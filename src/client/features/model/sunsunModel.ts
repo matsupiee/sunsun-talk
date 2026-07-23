@@ -152,8 +152,9 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     const dEyeR = p.distanceTo(EYE_R_POS);
     if (dEyeL < 0.155 || dEyeR < 0.155) continue;
     if (p.distanceTo(NOSE_POS) < 0.11) continue;
-    // 口パッチ（幅≒0.56・高さ≒0.27）が欠けない範囲だけ毛を避ける。
-    if (Math.abs(p.y - 1.68) < 0.16 && Math.abs(p.x) < 0.32 && p.z > 0.2) continue;
+    // 口パッチ（幅≒0.56・高さ≒0.27）よりわずかに狭い範囲だけ毛を避ける。
+    // パッチが無毛域を覆い隠しつつ、外周の毛が縁にちょうど被さる。
+    if (Math.abs(p.y - 1.68) < 0.12 && Math.abs(p.x) < 0.26 && p.z > 0.2) continue;
 
     // 顔の正面上部は短毛にして、目・鼻・口が読めるようにする（無毛地帯は作らない）。
     const nearFace = p.y > 1.45 && p.z > 0.05;
