@@ -177,8 +177,8 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     if (Math.abs(p.y - 1.78) < 0.2 && p.z > 0.1) lengthScale *= 0.8;
     // 口の直近リングはさらに短くして、毛が開口へ被らないようにする。
     if (Math.abs(p.y - 1.78) < 0.12 && p.z > 0.2) lengthScale *= 0.7;
-    // 頭頂は毛を少し長くして地肌・根元の露出を埋める。
-    if (n.y > 0.5) lengthScale *= 1.15;
+    // 頭頂は毛を長めにして地肌・根元の露出を埋める。
+    if (n.y > 0.4) lengthScale *= 1.3;
 
     // 15% は長めの「差し毛」にして、輪郭を大ぶりに波打たせる。
     const guardHair = !nearFace && Math.random() < 0.12;
@@ -277,10 +277,12 @@ function buildEye(side: 1 | -1): THREE.Group {
 
   // 黒円の内側に入る小さな白い点（フラット）。
   const dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.028, 20, 20), dotMat);
+  // 大きいとドーナツ状に見えるため黒目径の3割弱に留め、内下へ寄せる。
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.023, 20, 20), dotMat);
   dot.scale.set(1, 1, 0.2);
-  dot.position.copy(irisDir).multiplyScalar(0.2);
-  dot.lookAt(irisDir.clone().multiplyScalar(2));
+  const dotDir = new THREE.Vector3(-side * 0.36, -0.42, 1).normalize();
+  dot.position.copy(dotDir).multiplyScalar(0.2);
+  dot.lookAt(dotDir.clone().multiplyScalar(2));
   group.add(dot);
 
   return group;
@@ -346,7 +348,7 @@ function buildHand(side: 1 | -1): THREE.Group {
   // 全体がひとつながりのシルエットに見えるようにする。
   // 手首から幅が広がる平たいくさび（フェルトの手袋の土台）。
   const wedge = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.26, 0.38, 24), mat);
-  wedge.scale.z = 0.26;
+  wedge.scale.z = 0.2;
   wedge.position.y = -0.19;
   wedge.castShadow = true;
   group.add(wedge);
@@ -423,8 +425,8 @@ function buildLeg(side: 1 | -1): THREE.Group {
   const foot = new THREE.Mesh(new THREE.SphereGeometry(0.2, 32, 32), mat);
   foot.scale.set(1.25, 0.95, 3.0);
   // 内股に見えないよう左右間隔を空け、つま先をはっきり外向きに。
-  foot.position.set(side * 0.08, -1.1, 0.4);
-  foot.rotation.y = side * 0.3;
+  foot.position.set(side * 0.12, -1.1, 0.4);
+  foot.rotation.y = side * 0.45;
   foot.castShadow = true;
   group.add(foot);
 
