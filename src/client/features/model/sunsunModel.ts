@@ -18,9 +18,9 @@ import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.j
 // ---- パレット（実物の配色を参考に） ----------------------------------------
 const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
-const FUR_ROOT = "#2c6fdd"; // 毛束の根元〜中間（鮮やかな深いコバルト寄りブルー）
-const FUR_TIP = "#c5e3fc"; // 毛束の毛先（白っぽい空色のチップ）
-const SKIN_BASE = "#4c8be0"; // 毛の隙間から見える地肌（鮮やかなブルー）
+const FUR_ROOT = "#1c6fe8"; // 毛束の根元〜中間（鮮やかな深いコバルト寄りブルー）
+const FUR_TIP = "#bce0fd"; // 毛束の毛先（白っぽい空色のチップ）
+const SKIN_BASE = "#3f8ae8"; // 毛の隙間から見える地肌（鮮やかなブルー）
 const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
 const PUPIL = "#141210"; // 黒目・鼻・口の黒
 const LIMB_DARK = "#121216"; // 黒に近い腕・脚・手足
@@ -117,7 +117,9 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
   for (let i = 0; i < pos.count; i++) {
     const t = THREE.MathUtils.clamp(pos.getY(i), 0, 1);
     // 白化は毛先寄りに限定しつつ、中間色は鮮やかな青を保つ。
-    c.copy(rootColor).lerp(tipColor, Math.pow(t, 2.4));
+    // 指数を下げすぎると全体が白く飛び、上げすぎると根元の紺が支配して
+    // 頭頂が濃い斑に見える。中間の明るい青が最も長く見える値にする。
+    c.copy(rootColor).lerp(tipColor, Math.pow(t, 1.9));
     colors[i * 3] = c.r;
     colors[i * 3 + 1] = c.g;
     colors[i * 3 + 2] = c.b;
@@ -154,7 +156,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     if (p.distanceTo(NOSE_POS) < 0.11) continue;
     // 口デカール（半幅0.16・半高0.085）よりひと回り狭い範囲だけ毛を避ける。
     // デカールが無毛域を完全に覆い隠し、外周の毛が縁に被さる。
-    if (Math.abs(p.y - 1.71) < 0.04 && Math.abs(p.x) < 0.09 && p.z > 0.25) continue;
+    if (Math.abs(p.y - 1.74) < 0.04 && Math.abs(p.x) < 0.09 && p.z > 0.25) continue;
 
     // 顔の正面上部は短毛にして、目・鼻・口が読めるようにする（無毛地帯は作らない）。
     // 二値ではなく滑らかなグラデーションで移行し、胴との「継ぎ目」を作らない。
@@ -169,9 +171,9 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     if ((dEyeL < 0.3 || dEyeR < 0.3) && p.z > 0.12) lengthScale *= 0.6;
     // 口の周囲リングもやや短毛にして、毛が開口に垂れて口を隠さないようにする
     // （短くしすぎると刈り込み跡に見えるので控えめに）。
-    if (Math.abs(p.y - 1.72) < 0.2 && p.z > 0.1) lengthScale *= 0.7;
+    if (Math.abs(p.y - 1.75) < 0.2 && p.z > 0.1) lengthScale *= 0.7;
     // 口の直近リングはさらに短くして、毛が開口へ被らないようにする。
-    if (Math.abs(p.y - 1.72) < 0.12 && p.z > 0.2) lengthScale *= 0.55;
+    if (Math.abs(p.y - 1.75) < 0.12 && p.z > 0.2) lengthScale *= 0.55;
 
     // 15% は長めの「差し毛」にして、輪郭を大ぶりに波打たせる。
     const guardHair = !nearFace && Math.random() < 0.12;
@@ -192,7 +194,9 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
         Math.cos(p.x * 5.5 + p.y * 4.6) * 0.7 + (Math.random() - 0.5) * 0.22,
       )
       .multiplyScalar(0.4);
-    const crownDroop = Math.max(0, n.y) * 0.85; // 上向き法線ほど追加で寝かせる
+    // 上向き法線ほど追加で寝かせる。寝かせすぎると毛が倒れて根元の濃色が
+    // 真上から露出し、頭頂だけ濃い斑に見えるため控えめに。
+    const crownDroop = Math.max(0, n.y) * 0.6;
     // 長い差し毛ほど重力で強く垂れる（ウニ状の逆立ちを避ける）。
     const guardDroop = guardHair ? 0.5 : 0;
     dir
@@ -214,7 +218,10 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     let v = 0.88 + Math.random() * 0.12;
     // 短毛ほど根元の暗色が支配的になるため、顔の度合いに応じて滑らかに明るく。
     v *= 1 + 0.3 * Math.min(1, faceT);
-    fur.setColorAt(placed, tint.setRGB(v * 0.95, v * 0.98, v * 1.03));
+    // 頭頂（上向き法線）は真上から根元が見えて暗く沈みやすいので少し持ち上げる。
+    v *= 1 + 0.15 * Math.max(0, n.y);
+    // 赤成分を下げて青の彩度を保つ（グレー寄りに washed out させない）。
+    fur.setColorAt(placed, tint.setRGB(v * 0.92, v * 0.97, v * 1.05));
     placed++;
   }
   fur.count = placed;
@@ -329,7 +336,7 @@ function buildHand(side: 1 | -1): THREE.Group {
   // 全体がひとつながりのシルエットに見えるようにする。
   // 手首から幅が広がる平たいくさび（フェルトの手袋の土台）。
   const wedge = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.22, 0.38, 24), mat);
-  wedge.scale.z = 0.3;
+  wedge.scale.z = 0.26;
   wedge.position.y = -0.19;
   wedge.castShadow = true;
   group.add(wedge);
@@ -340,12 +347,13 @@ function buildHand(side: 1 | -1): THREE.Group {
   knuckle.castShadow = true;
   group.add(knuckle);
 
-  // 太く平たい 4 本指。実際の手のように指ごとに長さを変えて有機的に。
-  const fingerLens = [0.52, 0.6, 0.62, 0.5]; // 人差し指〜小指相当
+  // 長くしなやかな 4 本指。実際の手のように指ごとに長さを変えて有機的に。
+  // 実物写真の「長い指が軽く開く」印象に合わせ、長め＋やや細め＋広めの放射。
+  const fingerLens = [0.68, 0.78, 0.8, 0.65]; // 人差し指〜小指相当
   for (let i = 0; i < 4; i++) {
-    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, fingerLens[i], 6, 12), mat);
-    const fan = (i - 1.5) * 0.12; // 自然に開く
-    finger.position.set((i - 1.5) * 0.124, -0.66 - fingerLens[i] * 0.08, 0);
+    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.062, fingerLens[i], 6, 12), mat);
+    const fan = (i - 1.5) * 0.16; // 自然に開く
+    finger.position.set((i - 1.5) * 0.13, -0.66 - fingerLens[i] * 0.08, 0);
     finger.rotation.z = -fan;
     finger.scale.z = 0.5; // 断面を扁平に（フェルトの薄さ）
     finger.castShadow = true;
@@ -353,7 +361,7 @@ function buildHand(side: 1 | -1): THREE.Group {
   }
 
   // 親指は長めにして、手のひらからはっきり分岐させる。
-  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.064, 0.4, 6, 12), mat);
+  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.48, 6, 12), mat);
   thumb.position.set(side * 0.29, -0.34, 0);
   thumb.rotation.z = side * 0.8;
   thumb.scale.z = 0.5;
@@ -453,7 +461,7 @@ export function createSunsunModel(): SunsunModelParts {
   // 口パッチの球中心を体の軸上（口の高さ）に置くと、体表に沿って湾曲する。
   // 実物どおり鼻のすぐ下に。
   const mouth = buildMouth();
-  mouth.position.set(0, 1.72, 0);
+  mouth.position.set(0, 1.75, 0);
   head.add(mouth);
 
   // ---- 長い腕（肩は筒の上から約 1/3 の側面。体側に沿ってまっすぐ垂らす） ----
