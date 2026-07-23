@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { Link } from "@tanstack/react-router";
 import {
   RESPONSE_STICKERS,
   STICKER_BASE,
@@ -665,6 +666,13 @@ export function TalkPage() {
         <p className="m-0 mt-[7px] text-[clamp(22px,4vw,34px)] font-black leading-[1.1]">
           こえだけで おしゃべり
         </p>
+        <Link
+          to="/3d"
+          className="mt-[8px] inline-flex items-center gap-[6px] rounded-full px-[14px] py-[5px] text-[12px] font-black transition-transform duration-150 active:translate-y-px"
+          style={{ border: `2.5px solid ${INK}`, background: "#fff", color: INK }}
+        >
+          <span aria-hidden="true">🧊</span> 3Dスンスンを見る
+        </Link>
       </header>
 
       {/* ============ APP VIEWPORT ============ */}

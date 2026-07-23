@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import {
   createRootRoute,
   createRoute,
@@ -16,7 +17,37 @@ const talkRoute = createRoute({
   component: TalkPage,
 });
 
-const routeTree = rootRoute.addChildren([talkRoute]);
+// Three.js を含む 3D ページは重いので、/3d を開いたときだけ読み込む。
+const ModelPage = lazy(() =>
+  import("./features/model/page").then((m) => ({ default: m.ModelPage })),
+);
+
+const modelRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/3d",
+  component: () => (
+    <Suspense
+      fallback={
+        <div
+          style={{
+            display: "grid",
+            placeItems: "center",
+            minHeight: "100svh",
+            background: "#FBF4E1",
+            color: "#a48a55",
+            fontWeight: 700,
+          }}
+        >
+          スンスンを よびだし中…
+        </div>
+      }
+    >
+      <ModelPage />
+    </Suspense>
+  ),
+});
+
+const routeTree = rootRoute.addChildren([talkRoute, modelRoute]);
 
 export const router = createRouter({
   routeTree,

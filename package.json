@@ -14,9 +14,11 @@
   },
   "dependencies": {
     "@tanstack/react-router": "^1.95.0",
+    "@types/three": "^0.160.0",
     "hono": "^4.6.20",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "three": "^0.160.1"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "latest",
