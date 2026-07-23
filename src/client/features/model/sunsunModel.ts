@@ -272,16 +272,21 @@ function buildMouth(): THREE.Mesh {
     side: THREE.DoubleSide,
   });
   // 単位円 → 半幅0.32・半高0.16 の楕円にし、x を弧長として筒面に巻き付ける。
-  // この高さの体表半径は ≒0.458。周囲の毛の垂れに隠れず、かつ
-  // くちばし状に突き出ない範囲で少しだけ外へ。
-  const R = 0.5;
+  // この高さの体表半径は ≒0.458。中央は毛の垂れに隠れないよう外へ出し、
+  // 縁は体内へ沈むレンズ状にして、横から見ても縁が浮かないようにする。
+  const R_CENTER = 0.5;
+  const R_EDGE = 0.43;
   const geo = new THREE.CircleGeometry(1, 48);
   const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
   for (let i = 0; i < posAttr.count; i++) {
-    const ex = posAttr.getX(i) * 0.32;
-    const ey = posAttr.getY(i) * 0.16;
-    const theta = ex / R;
-    posAttr.setXYZ(i, R * Math.sin(theta), ey, R * Math.cos(theta));
+    const ux = posAttr.getX(i);
+    const uy = posAttr.getY(i);
+    const ex = ux * 0.32;
+    const ey = uy * 0.16;
+    const edge = Math.min(1, ux * ux + uy * uy); // 中心0→縁1
+    const r = R_CENTER - (R_CENTER - R_EDGE) * edge;
+    const theta = ex / r;
+    posAttr.setXYZ(i, r * Math.sin(theta), ey, r * Math.cos(theta));
   }
   geo.computeVertexNormals();
   return new THREE.Mesh(geo, mat);
