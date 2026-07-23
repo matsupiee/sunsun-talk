@@ -18,8 +18,8 @@ import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.j
 // ---- パレット（実物の配色を参考に） ----------------------------------------
 const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
-const FUR_ROOT = "#1e5fe2"; // 毛束の根元〜中間（鮮やかな深いコバルト寄りブルー）
-const FUR_TIP = "#cfe6ff"; // 毛束の毛先（白っぽい空色のチップ）
+const FUR_ROOT = "#3b6fd8"; // 毛束の根元〜中間（鮮やかなコバルト寄りブルー）
+const FUR_TIP = "#d6e8ff"; // 毛束の毛先（白っぽい空色のチップ）
 const SKIN_BASE = "#3f8ae8"; // 毛の隙間から見える地肌（鮮やかなブルー）
 const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
 const PUPIL = "#141210"; // 黒目・鼻・口の黒
@@ -257,7 +257,7 @@ function buildEye(side: 1 | -1): THREE.Group {
     roughness: 0.6,
     metalness: 0.0,
   });
-  const irisDir = new THREE.Vector3(-side * 0.2, -0.26, 1).normalize();
+  const irisDir = new THREE.Vector3(-side * 0.26, -0.33, 1).normalize();
   const iris = new THREE.Mesh(new THREE.SphereGeometry(0.095, 40, 40), irisMat);
   iris.scale.set(1, 1, 0.16);
   iris.position.copy(irisDir).multiplyScalar(0.185);
@@ -356,7 +356,7 @@ function buildHand(side: 1 | -1): THREE.Group {
     const fan = (i - 1.5) * 0.12;
     finger.position.set((i - 1.5) * 0.145, -0.66 - fingerLens[i] * 0.08, 0);
     finger.rotation.z = -fan;
-    finger.scale.z = 0.5; // 断面を扁平に（フェルトの薄さ）
+    finger.scale.z = 0.42; // 断面を扁平に（丸棒でなく平リボンのフェルト感）
     finger.castShadow = true;
     group.add(finger);
   }
@@ -365,7 +365,7 @@ function buildHand(side: 1 | -1): THREE.Group {
   const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.48, 6, 12), mat);
   thumb.position.set(side * 0.29, -0.34, 0);
   thumb.rotation.z = side * 0.8;
-  thumb.scale.z = 0.5;
+  thumb.scale.z = 0.42;
   thumb.castShadow = true;
   group.add(thumb);
 
@@ -447,7 +447,7 @@ export function createSunsunModel(): SunsunModelParts {
   eyeL.rotation.x = THREE.MathUtils.degToRad(20);
 
   const eyeR = buildEye(-1);
-  eyeR.position.set(-0.16, 2.16, 0.24);
+  eyeR.position.set(-0.16, 2.17, 0.24);
   eyeR.rotation.x = THREE.MathUtils.degToRad(20);
 
   head.add(eyeL, eyeR);
