@@ -547,7 +547,7 @@ function buildHand(side: 1 | -1): THREE.Group {
 }
 
 /** 細く長い黒い腕＋指付きの手。肩を原点に下へ垂れる。 */
-function buildArm(side: 1 | -1): THREE.Group {
+function buildArm(side: 1 | -1, handOverride?: THREE.Object3D): THREE.Group {
   const group = new THREE.Group();
   const mat = skinMaterial(LIMB_DARK);
   mat.roughness = 0.95;
@@ -559,7 +559,16 @@ function buildArm(side: 1 | -1): THREE.Group {
   group.add(upper);
 
   // 手の原点は手首（腕の末端）。そこから手袋が下に伸びる。
-  const hand = buildHand(side);
+  // Blender製の一体成形フェルト手袋（メタボール）があればそれを使う。
+  const hand = handOverride ?? buildHand(side);
+  if (handOverride) {
+    handOverride.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) {
+        obj.material = mat;
+        obj.castShadow = true;
+      }
+    });
+  }
   hand.position.y = -1.44;
   // 手のひらはやや体側へ。正面からも開いた指が見える程度に留める。
   // ひねりを付けると自動回転中のスクショで指同士が交差して見えるため正面向きに。
@@ -653,7 +662,10 @@ function prepareGlbBody(glb: THREE.Object3D): {
  * ラテ+デカール口の手続き版の代わりに、本当に凹んだ口とシェイプキーの
  * 口パクを持つメッシュを使う。省略時/失敗時は従来の手続き版。
  */
-export function createSunsunModel(glbBody?: THREE.Object3D): SunsunModelParts {
+export function createSunsunModel(
+  glbBody?: THREE.Object3D,
+  glbHands?: THREE.Object3D,
+): SunsunModelParts {
   const root = new THREE.Group();
 
   const prepared = glbBody ? prepareGlbBody(glbBody) : null;
@@ -717,12 +729,15 @@ export function createSunsunModel(glbBody?: THREE.Object3D): SunsunModelParts {
   // ファーの外側に腕のラインが見えるよう、肩をやや外に出す。
   // 腕はファーから離して外側へ垂らし、「腕」として読めるようにする
   // （体に沿わせすぎると3/4視点で黒い裂け目に見える）。
-  const armL = buildArm(1);
+  const handL = glbHands?.getObjectByName("HandL");
+  const handR = glbHands?.getObjectByName("HandR");
+
+  const armL = buildArm(1, handL);
   armL.position.set(0.53, 1.38, 0.1);
   armL.rotation.z = THREE.MathUtils.degToRad(13);
   armL.rotation.x = THREE.MathUtils.degToRad(-3);
 
-  const armR = buildArm(-1);
+  const armR = buildArm(-1, handR);
   armR.position.set(-0.53, 1.38, 0.1);
   armR.rotation.z = THREE.MathUtils.degToRad(-13);
   armR.rotation.x = THREE.MathUtils.degToRad(-3);

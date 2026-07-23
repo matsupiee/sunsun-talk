@@ -116,15 +116,19 @@ export function SunsunModel3D({
     let disposed = false;
     let sunsun: SunsunModelParts | null = null;
     (async () => {
-      let glbBody: THREE.Object3D | undefined;
-      try {
-        const gltf = await new GLTFLoader().loadAsync("/assets/model/sunsun-body.glb");
-        glbBody = gltf.scene;
-      } catch {
-        // フォールバック: 手続き版ボディ
-      }
+      const loader = new GLTFLoader();
+      const [glbBody, glbHands] = await Promise.all([
+        loader
+          .loadAsync("/assets/model/sunsun-body.glb")
+          .then((g) => g.scene as THREE.Object3D)
+          .catch(() => undefined),
+        loader
+          .loadAsync("/assets/model/sunsun-hands.glb")
+          .then((g) => g.scene as THREE.Object3D)
+          .catch(() => undefined),
+      ]);
       if (disposed) return;
-      sunsun = createSunsunModel(glbBody);
+      sunsun = createSunsunModel(glbBody, glbHands);
       scene.add(sunsun.root);
 
       // 実写リファレンス（公式ステッカー写真由来）でファーの色ムラを実物に寄せる。
