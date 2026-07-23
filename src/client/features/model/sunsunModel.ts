@@ -132,7 +132,7 @@ function buildMouth(): THREE.Mesh {
   const geo = new THREE.SphereGeometry(0.24, 40, 40);
   const mouth = new THREE.Mesh(geo, mat);
   // 横に広く、少し縦にも開いた開口。奥行きはつぶして面に貼り付ける。
-  mouth.scale.set(1.2, 0.56, 0.35);
+  mouth.scale.set(1.2, 0.56, 0.28);
   // 上辺をわずかに後ろへ倒し、軽く開いた口に見せる。
   mouth.rotation.x = 0.25;
   return mouth;
@@ -144,27 +144,27 @@ function buildHand(side: 1 | -1): THREE.Group {
   const mat = skinMaterial(LIMB_DARK);
   mat.roughness = 0.85;
 
-  // 手のひら（大きく平たい楕円）。フェルトらしく薄めに。
-  const palm = new THREE.Mesh(new THREE.SphereGeometry(0.22, 32, 32), mat);
-  palm.scale.set(1.3, 1.05, 0.4);
+  // 手のひらは丸い円盤ではなく、縦に長い平たいフェルト形。
+  const palm = new THREE.Mesh(new THREE.SphereGeometry(0.17, 32, 32), mat);
+  palm.scale.set(1.0, 1.25, 0.45);
   palm.castShadow = true;
   group.add(palm);
 
-  // 長めの平たい 4 本指。根元を手のひらに食い込ませて一体の手袋に見せる。
+  // 長い 4 本指をほぼ平行に（大きく扇に開かない）。根元は手のひらに食い込ませる。
   for (let i = 0; i < 4; i++) {
-    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.062, 0.36, 6, 12), mat);
-    const fan = (i - 1.5) * 0.12; // 扇の開き
-    finger.position.set((i - 1.5) * 0.128, -0.29, 0);
+    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.05, 0.42, 6, 12), mat);
+    const fan = (i - 1.5) * 0.02; // ほぼ平行
+    finger.position.set((i - 1.5) * 0.098, -0.38, 0);
     finger.rotation.z = -fan;
-    finger.scale.z = 0.75; // 指も平たく
+    finger.scale.z = 0.8; // 指も平たく
     finger.castShadow = true;
     group.add(finger);
   }
 
   // 親指はやや斜め下へ（真横に張らない）。
-  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.17, 6, 12), mat);
-  thumb.position.set(side * 0.27, -0.09, 0);
-  thumb.rotation.z = side * 0.8;
+  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.2, 6, 12), mat);
+  thumb.position.set(side * 0.2, -0.16, 0);
+  thumb.rotation.z = side * 0.5;
   thumb.castShadow = true;
   group.add(thumb);
 
@@ -187,9 +187,9 @@ function buildArm(side: 1 | -1): THREE.Group {
   hand.position.y = -1.82;
   // 手は腕の延長で自然に垂らす。手のひらは体側へ向け、正面からは
   // 手の甲〜側面が見えるようにする（前へ突き出さない）。
-  hand.rotation.y = -side * 0.7;
+  hand.rotation.y = -side * 0.5;
   // フェルトの手袋らしい存在感が出るよう少し大きめに。
-  hand.scale.setScalar(1.25);
+  hand.scale.setScalar(1.15);
   group.add(hand);
 
   return group;
@@ -201,14 +201,15 @@ function buildLeg(side: 1 | -1): THREE.Group {
   const mat = skinMaterial(LIMB_DARK);
   mat.roughness = 0.85;
 
-  const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.15, 20), mat);
+  // 脚は棒ではなく、ぬいぐるみらしい太さ（筒幅の約 1/4〜1/3）。
+  const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.135, 0.15, 1.15, 24), mat);
   leg.position.y = -0.56;
   leg.castShadow = true;
   group.add(leg);
 
   // 大きく丸い靴のような足。前方主体に突き出し、軽い外股に。
   const foot = new THREE.Mesh(new THREE.SphereGeometry(0.2, 32, 32), mat);
-  foot.scale.set(1.25, 0.95, 2.6);
+  foot.scale.set(1.25, 0.95, 2.8);
   foot.position.set(side * 0.03, -1.1, 0.36);
   foot.rotation.y = side * 0.2;
   foot.castShadow = true;
