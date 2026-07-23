@@ -25,6 +25,7 @@ const PERIOD_CHOICES: PeriodChoice[] = ["auto", ...PERIODS.map((p) => p.key)];
 export function ModelPage() {
   const [talking, setTalking] = useState(false);
   const [autoRotate, setAutoRotate] = useState(true);
+  const [fluffy, setFluffy] = useState(true);
   const [choice, setChoice] = useState<PeriodChoice>("auto");
   const [clockPeriod, setClockPeriod] = useState<PeriodKey>(() => getPeriod().key);
 
@@ -63,6 +64,7 @@ export function ModelPage() {
           talking={talking}
           period={period}
           autoRotate={autoRotate}
+          fluffy={fluffy}
           className="min-h-[320px] flex-1"
         />
 
@@ -99,6 +101,20 @@ export function ModelPage() {
               }}
             >
               じどう回転
+            </button>
+            <button
+              type="button"
+              onClick={() => setFluffy((v) => !v)}
+              aria-pressed={fluffy}
+              className="rounded-full px-[16px] py-[12px] text-[14px] font-black transition-transform duration-150 active:translate-y-px"
+              style={{
+                border: `3px solid ${INK}`,
+                background: fluffy ? INK : PANEL_BG,
+                color: fluffy ? "#fff" : INK,
+                boxShadow: "0 4px 0 rgba(22,19,14,.22)",
+              }}
+            >
+              もこもこ
             </button>
           </div>
 

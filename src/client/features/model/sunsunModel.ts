@@ -1,21 +1,26 @@
 import * as THREE from "three";
+import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.js";
 
 /**
  * パペット「スンスン」の 3D モデルをプリミティブから手続き的に組み立てる。
  *
- * 実物は水色のふわふわパペットだが、体毛のふわふわ感は 3D では再現が難しいため
- * 表面はツルッとしたビニール／プラスチック調のマット寄りマテリアルで表現する。
+ * 水色の体は InstancedMesh で数万本の毛束を植えてファーの「もこもこ感」を
+ * 再現する（地肌には sheen の起毛光沢）。腕・脚・手足・目・鼻・口は
+ * 実物どおりフェルト／プラスチック調のツルッとした表面のまま。
  *
  * 全身のプロポーション（全身写真から）:
  * - 水色の体は「細長い筒」状で、幅は全身の高さの約 1/4。頭と胴の区別は無い。
  * - 顔（小さな白目×2・黒い丸鼻・横に広い口）は筒の最上部に小さくまとまる。
  * - 黒い腕は非常に長く（全身の約半分）、指の分かれた大きな手が付く。
- * - 筒の下から黒く細い脚が 2 本出て、大きく丸い黒い足で立つ。
+ * - 筒の下から太めの黒い脚が 2 本出て、大きく丸い黒い足で立つ。
  */
 
 // ---- パレット（実物の配色を参考に） ----------------------------------------
 const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
+const FUR_ROOT = "#5f7ecd"; // 毛束の根元（深いペリウィンクル。陰のコントラストを作る）
+const FUR_TIP = "#e8f1fe"; // 毛束の毛先（白に近い水色）
+const SKIN_BASE = "#86a8e4"; // 毛の隙間から見える地肌（毛の陰に馴染む深め）
 const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
 const PUPIL = "#141210"; // 黒目・鼻・口の黒
 const LIMB_DARK = "#121216"; // 黒に近い腕・脚・手足
@@ -30,6 +35,8 @@ export interface SunsunModelParts {
   mouth: THREE.Mesh;
   /** 腕(左右)。軽く揺らす */
   arms: THREE.Group[];
+  /** 体のファー（毛束の InstancedMesh）。visible でもこもこON/OFF */
+  fur: THREE.InstancedMesh;
 }
 
 function skinMaterial(color: string) {
@@ -66,10 +73,134 @@ function buildBody(): THREE.Mesh {
   const geometry = new THREE.LatheGeometry(points, 64);
   geometry.computeVertexNormals();
 
-  const mesh = new THREE.Mesh(geometry, skinMaterial(SKY));
+  // 地肌は起毛（sheen）のある布マテリアル。毛束の隙間から見えても
+  // ファーの陰のように馴染む、やや深めの水色にする。
+  const material = new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(SKIN_BASE),
+    roughness: 0.95,
+    metalness: 0,
+    sheen: 1.0,
+    sheenColor: new THREE.Color(SKY_LIGHT),
+    sheenRoughness: 0.55,
+  });
+
+  const mesh = new THREE.Mesh(geometry, material);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   return mesh;
+}
+
+// ---- ファー（毛束）--------------------------------------------------------
+
+/** 顔パーツの位置（毛を避ける・短くする判定に使う）。 */
+const EYE_L_POS = new THREE.Vector3(0.125, 2.15, 0.22);
+const EYE_R_POS = new THREE.Vector3(-0.125, 2.16, 0.22);
+const NOSE_POS = new THREE.Vector3(0, 1.9, 0.48);
+
+/**
+ * 体表面に数万本の毛束（先細りの小さな錐）を InstancedMesh で植える。
+ * - 根元→毛先で深い水色→白に近い水色のグラデーション（頂点カラー）
+ * - 法線方向＋下向きの「毛流れ」で、実物のやや垂れた長毛ファーに寄せる
+ * - 目・鼻・口のまわりは毛を避け、顔の正面は短毛にして表情を隠さない
+ */
+function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
+  const COUNT = 60000;
+
+  // 毛束テンプレート。根元を原点、+Y へ長さ 1 の細い錐。
+  const geo = new THREE.ConeGeometry(1, 1, 4, 1, true);
+  geo.translate(0, 0.5, 0);
+  const pos = geo.getAttribute("position");
+  const colors = new Float32Array(pos.count * 3);
+  const rootColor = new THREE.Color(FUR_ROOT);
+  const tipColor = new THREE.Color(FUR_TIP);
+  const c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const t = THREE.MathUtils.clamp(pos.getY(i), 0, 1);
+    c.copy(rootColor).lerp(tipColor, t);
+    colors[i * 3] = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+  const mat = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.9,
+    metalness: 0,
+  });
+  const fur = new THREE.InstancedMesh(geo, mat, COUNT);
+
+  const sampler = new MeshSurfaceSampler(body).build();
+  const p = new THREE.Vector3();
+  const n = new THREE.Vector3();
+  const dir = new THREE.Vector3();
+  const jitter = new THREE.Vector3();
+  const down = new THREE.Vector3(0, -1, 0);
+  const up = new THREE.Vector3(0, 1, 0);
+  const quat = new THREE.Quaternion();
+  const dummy = new THREE.Object3D();
+  const tint = new THREE.Color();
+
+  let placed = 0;
+  let guard = 0;
+  while (placed < COUNT && guard++ < COUNT * 40) {
+    sampler.sample(p, n);
+
+    // 目の球・鼻・口の輪郭ぎわ数ミリだけは毛を植えない（それ以外は頭頂まで生やす）。
+    const dEyeL = p.distanceTo(EYE_L_POS);
+    const dEyeR = p.distanceTo(EYE_R_POS);
+    if (dEyeL < 0.155 || dEyeR < 0.155) continue;
+    if (p.distanceTo(NOSE_POS) < 0.11) continue;
+    if (Math.abs(p.y - 1.68) < 0.11 && Math.abs(p.x) < 0.26 && p.z > 0.22) continue;
+
+    // 顔の正面上部は短毛にして、目・鼻・口が読めるようにする（無毛地帯は作らない）。
+    const nearFace = p.y > 1.45 && p.z > 0.05;
+    let lengthScale = nearFace ? 0.55 : 1.0;
+    // 目のすぐ近くはさらに短毛にして、白目が毛の上に半分埋まって見えるようにする。
+    if (dEyeL < 0.3 || dEyeR < 0.3) lengthScale *= 0.45;
+
+    // 15% は長めの「差し毛」にして、輪郭を大ぶりに波打たせる。
+    const guardHair = !nearFace && Math.random() < 0.15;
+    // 針状に見えないよう、基本の毛は短め・太めに。
+    const len = (0.11 + Math.random() * 0.13) * lengthScale * (guardHair ? 1.6 : 1.0);
+    const thickness = (0.024 + Math.random() * 0.016) * (guardHair ? 1.25 : 1.0);
+
+    // 毛流れ: 法線方向を基本に下へ垂らし、位置に応じたうねりで数本単位の
+    // 「房」のまとまりを作る（完全ランダムだと針山に見えるため）。
+    // 頭頂ほど強く寝かせて、上向きのトゲにならないようにする。
+    // 低めの周波数で大きめの房を作る（高周波だとウニ状に散らばる）。
+    const clump = Math.sin(p.x * 4.5 + p.y * 3.5) * 0.5 + Math.sin(p.z * 5.2 - p.y * 2.8) * 0.5;
+    jitter
+      .set(
+        Math.sin(p.y * 6 + p.z * 4.2) * 0.7 + (Math.random() - 0.5) * 0.22,
+        clump * 0.35,
+        Math.cos(p.x * 5.5 + p.y * 4.6) * 0.7 + (Math.random() - 0.5) * 0.22,
+      )
+      .multiplyScalar(0.45);
+    const crownDroop = Math.max(0, n.y) * 0.8; // 上向き法線ほど追加で寝かせる
+    dir
+      .copy(n)
+      .addScaledVector(down, 0.95 + crownDroop + Math.random() * 0.4)
+      .add(jitter)
+      .normalize();
+    quat.setFromUnitVectors(up, dir);
+
+    dummy.position.copy(p).addScaledVector(n, -0.02);
+    dummy.quaternion.copy(quat);
+    dummy.scale.set(thickness, len, thickness * 0.75);
+    dummy.updateMatrix();
+    fur.setMatrixAt(placed, dummy.matrix);
+
+    // 毛束ごとの明るさのゆらぎ（下振れ広めで毛の谷間の陰を作る）。
+    const v = 0.85 + Math.random() * 0.2;
+    fur.setColorAt(placed, tint.setRGB(v, v, v));
+    placed++;
+  }
+  fur.count = placed;
+  fur.instanceMatrix.needsUpdate = true;
+  if (fur.instanceColor) fur.instanceColor.needsUpdate = true;
+
+  return fur;
 }
 
 /** 頭のてっぺんに乗る小さなグーグリーアイ（白目＋小さめの黒目）。 */
@@ -131,8 +262,8 @@ function buildMouth(): THREE.Mesh {
   });
   const geo = new THREE.SphereGeometry(0.24, 40, 40);
   const mouth = new THREE.Mesh(geo, mat);
-  // 横に広く、少し縦にも開いた開口。奥行きはつぶして面に貼り付ける。
-  mouth.scale.set(1.2, 0.56, 0.28);
+  // 横に広く、少し縦にも開いた浅い開口。唇状に突き出さないよう奥行きを強くつぶす。
+  mouth.scale.set(1.2, 0.56, 0.16);
   // 上辺をわずかに後ろへ倒し、軽く開いた口に見せる。
   mouth.rotation.x = 0.25;
   return mouth;
@@ -228,6 +359,10 @@ export function createSunsunModel(): SunsunModelParts {
   const body = buildBody();
   root.add(body);
 
+  // 体のファー（もこもこ）。visible の切り替えでツルッと版と比較できる。
+  const fur = buildFur(body);
+  root.add(fur);
+
   // ---- 顔（まとめて軽く動かせるようグループ化） ----
   const head = new THREE.Group();
   root.add(head);
@@ -247,25 +382,26 @@ export function createSunsunModel(): SunsunModelParts {
 
   head.add(eyeL, eyeR);
 
-  // 鼻は目のすぐ下・中央。面から少し前へ出して見えるように。
+  // 鼻は目のすぐ下・中央。ファーに埋もれないよう毛先より前へ出す。
   const nose = buildNose();
-  nose.position.set(0, 1.9, 0.42);
+  nose.position.set(0, 1.9, 0.48);
   head.add(nose);
 
-  // 口は鼻の下、横に広く浅い開口。面すれすれに沈めて庇状に突き出させない。
+  // 口は鼻の下、横に広く浅い開口。毛に埋もれず、突き出しすぎない位置に。
   const mouth = buildMouth();
   mouth.position.set(0, 1.68, 0.34);
   head.add(mouth);
 
   // ---- 長い腕（肩は筒の上から約 1/3 の側面。体側に沿ってまっすぐ垂らす） ----
+  // ファーの外側に腕のラインが見えるよう、肩をやや外に出す。
   const armL = buildArm(1);
-  armL.position.set(0.44, 1.38, 0.02);
-  armL.rotation.z = THREE.MathUtils.degToRad(5);
+  armL.position.set(0.5, 1.38, 0.02);
+  armL.rotation.z = THREE.MathUtils.degToRad(7);
   armL.rotation.x = THREE.MathUtils.degToRad(-3);
 
   const armR = buildArm(-1);
-  armR.position.set(-0.44, 1.38, 0.02);
-  armR.rotation.z = THREE.MathUtils.degToRad(-5);
+  armR.position.set(-0.5, 1.38, 0.02);
+  armR.rotation.z = THREE.MathUtils.degToRad(-7);
   armR.rotation.x = THREE.MathUtils.degToRad(-3);
 
   root.add(armL, armR);
@@ -279,7 +415,7 @@ export function createSunsunModel(): SunsunModelParts {
 
   root.add(legL, legR);
 
-  return { root, head, eyes: [eyeL, eyeR], mouth, arms: [armL, armR] };
+  return { root, head, eyes: [eyeL, eyeR], mouth, arms: [armL, armR], fur };
 }
 
 export const SUNSUN_COLORS = { SKY, SKY_LIGHT, EYE_WHITE, PUPIL, LIMB_DARK };

@@ -21,6 +21,8 @@ export interface SunsunModel3DProps {
   autoRotate?: boolean;
   /** ドラッグで回せるようにする。 */
   interactive?: boolean;
+  /** 体のファー（もこもこ）を表示する。 */
+  fluffy?: boolean;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -30,6 +32,7 @@ export function SunsunModel3D({
   period,
   autoRotate = false,
   interactive = true,
+  fluffy = true,
   className,
   style,
 }: SunsunModel3DProps) {
@@ -37,8 +40,10 @@ export function SunsunModel3D({
   // アニメーションループから最新の props を読むための参照。
   const talkingRef = useRef(talking);
   const autoRotateRef = useRef(autoRotate);
+  const fluffyRef = useRef(fluffy);
   talkingRef.current = talking;
   autoRotateRef.current = autoRotate;
+  fluffyRef.current = fluffy;
 
   // 時間帯の色はマウント後にも切り替えられるよう ref で保持。
   const tintRef = useRef(period ? STAGE_TINT[period] : { bg: "#e9f4fb", ground: "#cfe4f1" });
@@ -171,6 +176,9 @@ export function SunsunModel3D({
         sunsun.mouth.scale.y += (mouthBaseY - sunsun.mouth.scale.y) * 0.15;
         sunsun.mouth.scale.z += (0.7 - sunsun.mouth.scale.z) * 0.15;
       }
+
+      // もこもこON/OFF。
+      sunsun.fur.visible = fluffyRef.current;
 
       controls.autoRotate = autoRotateRef.current;
       controls.autoRotateSpeed = 1.1;
