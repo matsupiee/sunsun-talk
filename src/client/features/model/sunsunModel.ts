@@ -154,7 +154,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     if (p.distanceTo(NOSE_POS) < 0.12) continue;
     // 口デカール（半幅0.16・半高0.085）よりひと回り狭い範囲だけ毛を避ける。
     // デカールが無毛域を完全に覆い隠し、外周の毛が縁に被さる。
-    if (Math.abs(p.y - 1.72) < 0.05 && Math.abs(p.x) < 0.11 && p.z > 0.25) continue;
+    if (Math.abs(p.y - 1.72) < 0.055 && Math.abs(p.x) < 0.12 && p.z > 0.25) continue;
 
     // 顔の正面上部は短毛にして、目・鼻・口が読めるようにする（無毛地帯は作らない）。
     const nearFace = p.y > 1.45 && p.z > 0.05;
@@ -164,6 +164,8 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     // 口の周囲リングもやや短毛にして、毛が開口に垂れて口を隠さないようにする
     // （短くしすぎると刈り込み跡に見えるので控えめに）。
     if (Math.abs(p.y - 1.72) < 0.2 && p.z > 0.1) lengthScale *= 0.7;
+    // 口の直近リングはさらに短くして、毛が開口へ被らないようにする。
+    if (Math.abs(p.y - 1.72) < 0.12 && p.z > 0.2) lengthScale *= 0.55;
 
     // 15% は長めの「差し毛」にして、輪郭を大ぶりに波打たせる。
     const guardHair = !nearFace && Math.random() < 0.12;
@@ -312,9 +314,9 @@ function buildHand(side: 1 | -1): THREE.Group {
   // 丸みのある平板にし、指は根元同士が触れ合う間隔で深く食い込ませて
   // 全体がひとつながりのシルエットに見えるようにする。
   // 手のひらは小さめ・薄めにして、長い指が主役になるようにする。
-  const palm = new THREE.Mesh(new THREE.SphereGeometry(0.2, 32, 32), mat);
-  palm.scale.set(1.0, 0.9, 0.13);
-  palm.position.y = -0.22;
+  const palm = new THREE.Mesh(new THREE.SphereGeometry(0.22, 32, 32), mat);
+  palm.scale.set(1.05, 0.95, 0.13);
+  palm.position.y = -0.24;
   palm.castShadow = true;
   group.add(palm);
   // 手首→手のひらをつなぐくさび。
@@ -326,8 +328,8 @@ function buildHand(side: 1 | -1): THREE.Group {
   // 長くしなやかな 4 本指。根元同士が触れる間隔＋深い食い込みで一枚に。
   for (let i = 0; i < 4; i++) {
     const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.054, 0.66, 6, 12), mat);
-    const fan = (i - 1.5) * 0.18; // パーに近い開き
-    finger.position.set((i - 1.5) * 0.108, -0.62, 0);
+    const fan = (i - 1.5) * 0.12; // 自然な開き
+    finger.position.set((i - 1.5) * 0.1, -0.62, 0);
     finger.rotation.z = -fan;
     finger.scale.z = 0.55; // 指も平たく
     finger.castShadow = true;
