@@ -364,12 +364,12 @@ function buildHand(side: 1 | -1): THREE.Group {
   // 手全体が「切れ込みの入った一枚のフェルト」として読めるようにする。
   const fingerLens = [0.84, 0.96, 0.98, 0.82]; // 人差し指〜小指相当（掌より指が長い）
   for (let i = 0; i < 4; i++) {
-    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, fingerLens[i], 6, 12), mat);
-    // 開きは控えめの扇。根元は互いにほぼ接し、先だけ軽く開く。
-    const fan = (i - 1.5) * 0.13;
+    // 太いとソーセージ束に見えるため、細め＋指間の隙間で1本ずつ独立させる。
+    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.072, fingerLens[i], 6, 12), mat);
+    const fan = (i - 1.5) * 0.15;
     finger.position.set((i - 1.5) * 0.155, -0.58 - fingerLens[i] * 0.08, 0);
     finger.rotation.z = -fan;
-    finger.scale.z = 0.3; // 断面を扁平に（丸棒でなく平リボンのフェルト感）
+    finger.scale.z = 0.28; // 断面を扁平に（丸棒でなく平リボンのフェルト感）
     finger.castShadow = true;
     group.add(finger);
   }
@@ -422,11 +422,12 @@ function buildLeg(side: 1 | -1): THREE.Group {
   group.add(leg);
 
   // 大きく丸い靴のような足。前方主体に突き出し、軽い外股に。
+  // 薄い座布団でなく、丸くふくらんだプラッシュ靴のボリュームを出す。
   const foot = new THREE.Mesh(new THREE.SphereGeometry(0.2, 32, 32), mat);
-  foot.scale.set(1.25, 0.95, 3.0);
-  // 内股に見えないよう左右間隔を空け、つま先をはっきり外向きに。
-  foot.position.set(side * 0.12, -1.1, 0.4);
-  foot.rotation.y = side * 0.45;
+  foot.scale.set(1.25, 1.3, 2.6);
+  // 内股に見えないよう左右間隔を空け、つま先はやや外向きに（開きすぎない）。
+  foot.position.set(side * 0.1, -1.02, 0.4);
+  foot.rotation.y = side * 0.3;
   foot.castShadow = true;
   group.add(foot);
 
