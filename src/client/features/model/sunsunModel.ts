@@ -159,7 +159,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     if (p.distanceTo(NOSE_POS) < 0.11) continue;
     // 口デカール（半幅0.16・半高0.085）よりひと回り狭い範囲だけ毛を避ける。
     // デカールが無毛域を完全に覆い隠し、外周の毛が縁に被さる。
-    if (Math.abs(p.y - 1.77) < 0.035 && Math.abs(p.x) < 0.075 && p.z > 0.25) continue;
+    if (Math.abs(p.y - 1.745) < 0.035 && Math.abs(p.x) < 0.075 && p.z > 0.25) continue;
 
     // 顔の正面上部は短毛にして、目・鼻・口が読めるようにする（無毛地帯は作らない）。
     // 二値ではなく滑らかなグラデーションで移行し、胴との「継ぎ目」を作らない。
@@ -174,9 +174,9 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     if ((dEyeL < 0.3 || dEyeR < 0.3) && p.z > 0.12) lengthScale *= 0.6;
     // 口の周囲リングもやや短毛にして、毛が開口に垂れて口を隠さないようにする
     // （短くしすぎると刈り込み跡に見えるので控えめに）。
-    if (Math.abs(p.y - 1.78) < 0.2 && p.z > 0.1) lengthScale *= 0.8;
+    if (Math.abs(p.y - 1.755) < 0.2 && p.z > 0.1) lengthScale *= 0.8;
     // 口の直近リングはさらに短くして、毛が開口へ被らないようにする。
-    if (Math.abs(p.y - 1.78) < 0.12 && p.z > 0.2) lengthScale *= 0.7;
+    if (Math.abs(p.y - 1.755) < 0.12 && p.z > 0.2) lengthScale *= 0.7;
     // 頭頂は毛を長めにして地肌・根元の露出を埋める。
     if (n.y > 0.4) lengthScale *= 1.3;
 
@@ -306,11 +306,9 @@ function buildNose(): THREE.Mesh {
  * メッシュの原点は体の軸上（口の高さ）に置くこと。しゃべる時は scale.y で縦に開く。
  */
 function buildMouth(): THREE.Mesh {
-  const mat = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(PUPIL),
-    // つや消しにして「面に開いた穴」らしく。
-    roughness: 0.9,
-    metalness: 0.0,
+  // ライティングで灰色に浮かないよう、非ライトの黒（穴として読める）。
+  const mat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color("#131110"),
     side: THREE.DoubleSide,
   });
   // 実物の口は小さく控えめ（幅は筒幅の約1/4以下）。
@@ -367,7 +365,8 @@ function buildHand(side: 1 | -1): THREE.Group {
   for (let i = 0; i < 4; i++) {
     // 根元は互いに接し、先端だけ切れ込みで分かれる「一枚フェルトの手袋」。
     const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, fingerLens[i], 6, 12), mat);
-    const fan = (i - 1.5) * 0.09;
+    // 切れ込みが根元まで見えると櫛状になるため、開きは先端側だけ僅かに。
+    const fan = (i - 1.5) * 0.06;
     finger.position.set((i - 1.5) * 0.15, -0.52 - fingerLens[i] * 0.08, 0);
     finger.rotation.z = -fan;
     finger.scale.z = 0.28; // 断面を扁平に（丸棒でなく平リボンのフェルト感）
@@ -377,8 +376,9 @@ function buildHand(side: 1 | -1): THREE.Group {
 
   // 親指は長めにして、手のひらからはっきり分岐させる。
   const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.58, 6, 12), mat);
-  thumb.position.set(side * 0.29, -0.34, 0);
-  thumb.rotation.z = side * 0.8;
+  // 横へ棒状に突き出さず、手のひらに沿って分岐して見える角度に。
+  thumb.position.set(side * 0.26, -0.36, 0);
+  thumb.rotation.z = side * 0.55;
   thumb.scale.z = 0.42;
   thumb.castShadow = true;
   group.add(thumb);
@@ -478,8 +478,10 @@ export function createSunsunModel(): SunsunModelParts {
   // 口は鼻の下、横に広く浅い開口。毛に埋もれず、突き出しすぎない位置に。
   // 口パッチの球中心を体の軸上（口の高さ）に置くと、体表に沿って湾曲する。
   // 実物どおり鼻のすぐ下に。
+  // 上げすぎると鼻ボタンが口の中央を正面から隠し「二重の口」に見えるので、
+  // 鼻の下端ぎりぎりの高さに置く。
   const mouth = buildMouth();
-  mouth.position.set(0, 1.78, 0);
+  mouth.position.set(0, 1.755, 0);
   head.add(mouth);
 
   // ---- 長い腕（肩は筒の上から約 1/3 の側面。体側に沿ってまっすぐ垂らす） ----
