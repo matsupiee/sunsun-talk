@@ -18,9 +18,9 @@ import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.j
 // ---- パレット（実物の配色を参考に） ----------------------------------------
 const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
-const FUR_ROOT = "#5f7ecd"; // 毛束の根元（深いペリウィンクル。陰のコントラストを作る）
+const FUR_ROOT = "#6c8ad8"; // 毛束の根元（彩度のあるペリウィンクル。陰のコントラストを作る）
 const FUR_TIP = "#e8f1fe"; // 毛束の毛先（白に近い水色）
-const SKIN_BASE = "#86a8e4"; // 毛の隙間から見える地肌（毛の陰に馴染む深め）
+const SKIN_BASE = "#8fafe8"; // 毛の隙間から見える地肌（暗く沈んでハゲに見えない明るさ）
 const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
 const PUPIL = "#141210"; // 黒目・鼻・口の黒
 const LIMB_DARK = "#121216"; // 黒に近い腕・脚・手足
@@ -160,10 +160,10 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     if (dEyeL < 0.3 || dEyeR < 0.3) lengthScale *= 0.45;
 
     // 15% は長めの「差し毛」にして、輪郭を大ぶりに波打たせる。
-    const guardHair = !nearFace && Math.random() < 0.15;
+    const guardHair = !nearFace && Math.random() < 0.12;
     // 針状に見えないよう、基本の毛は短め・太めに。
     const len = (0.11 + Math.random() * 0.13) * lengthScale * (guardHair ? 1.6 : 1.0);
-    const thickness = (0.024 + Math.random() * 0.016) * (guardHair ? 1.25 : 1.0);
+    const thickness = (0.028 + Math.random() * 0.016) * (guardHair ? 1.25 : 1.0);
 
     // 毛流れ: 法線方向を基本に下へ垂らし、位置に応じたうねりで数本単位の
     // 「房」のまとまりを作る（完全ランダムだと針山に見えるため）。
@@ -388,19 +388,21 @@ export function createSunsunModel(): SunsunModelParts {
   head.add(nose);
 
   // 口は鼻の下、横に広く浅い開口。毛に埋もれず、突き出しすぎない位置に。
+  // 体表（この高さの半径 ≒0.44）からわずかに前へ出るだけの位置に置き、
+  // 「面に開いた浅い開口」に見せる（奥に沈めると欠けて見える）。
   const mouth = buildMouth();
-  mouth.position.set(0, 1.68, 0.34);
+  mouth.position.set(0, 1.68, 0.42);
   head.add(mouth);
 
   // ---- 長い腕（肩は筒の上から約 1/3 の側面。体側に沿ってまっすぐ垂らす） ----
   // ファーの外側に腕のラインが見えるよう、肩をやや外に出す。
   const armL = buildArm(1);
-  armL.position.set(0.5, 1.38, 0.02);
+  armL.position.set(0.5, 1.38, 0.1);
   armL.rotation.z = THREE.MathUtils.degToRad(7);
   armL.rotation.x = THREE.MathUtils.degToRad(-3);
 
   const armR = buildArm(-1);
-  armR.position.set(-0.5, 1.38, 0.02);
+  armR.position.set(-0.5, 1.38, 0.1);
   armR.rotation.z = THREE.MathUtils.degToRad(-7);
   armR.rotation.x = THREE.MathUtils.degToRad(-3);
 
