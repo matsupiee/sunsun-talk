@@ -20,7 +20,7 @@ const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィ
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
 const FUR_ROOT = "#2f6fd8"; // 毛束の根元〜中間（鮮やかな深めのブルー）
 const FUR_TIP = "#bfe0fb"; // 毛束の毛先（白っぽい空色のチップ）
-const SKIN_BASE = "#5f97e4"; // 毛の隙間から見える地肌（鮮やかなブルー）
+const SKIN_BASE = "#4c8be0"; // 毛の隙間から見える地肌（鮮やかなブルー）
 const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
 const PUPIL = "#141210"; // 黒目・鼻・口の黒
 const LIMB_DARK = "#121216"; // 黒に近い腕・脚・手足
@@ -95,7 +95,7 @@ function buildBody(): THREE.Mesh {
 /** 顔パーツの位置（毛を避ける・短くする判定に使う）。 */
 const EYE_L_POS = new THREE.Vector3(0.155, 2.13, 0.24);
 const EYE_R_POS = new THREE.Vector3(-0.155, 2.17, 0.24);
-const NOSE_POS = new THREE.Vector3(0, 1.9, 0.46);
+const NOSE_POS = new THREE.Vector3(0, 1.94, 0.46);
 
 /**
  * 体表面に数万本の毛束（先細りの小さな錐）を InstancedMesh で植える。
@@ -150,15 +150,15 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     // 目の球・鼻・口の輪郭ぎわ数ミリだけは毛を植えない（それ以外は頭頂まで生やす）。
     const dEyeL = p.distanceTo(EYE_L_POS);
     const dEyeR = p.distanceTo(EYE_R_POS);
-    if (dEyeL < 0.19 || dEyeR < 0.19) continue;
-    if (p.distanceTo(NOSE_POS) < 0.13) continue;
+    if (dEyeL < 0.16 || dEyeR < 0.16) continue;
+    if (p.distanceTo(NOSE_POS) < 0.12) continue;
     // 口デカール（半幅0.16・半高0.085）よりひと回り狭い範囲だけ毛を避ける。
     // デカールが無毛域を完全に覆い隠し、外周の毛が縁に被さる。
-    if (Math.abs(p.y - 1.72) < 0.055 && Math.abs(p.x) < 0.1 && p.z > 0.25) continue;
+    if (Math.abs(p.y - 1.72) < 0.05 && Math.abs(p.x) < 0.13 && p.z > 0.25) continue;
 
     // 顔の正面上部は短毛にして、目・鼻・口が読めるようにする（無毛地帯は作らない）。
     const nearFace = p.y > 1.45 && p.z > 0.05;
-    let lengthScale = nearFace ? 0.55 : 1.0;
+    let lengthScale = nearFace ? 0.62 : 1.0;
     // 目のすぐ近くはさらに短毛にして、白目が毛の上に半分埋まって見えるようにする。
     if (dEyeL < 0.3 || dEyeR < 0.3) lengthScale *= 0.45;
     // 口の周囲リングもやや短毛にして、毛が開口に垂れて口を隠さないようにする
@@ -262,7 +262,7 @@ function buildNose(): THREE.Mesh {
     roughness: 0.55,
   });
   mat.roughness = 0.78; // マットな布の質感
-  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.105, 32, 32), mat);
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.115, 32, 32), mat);
   nose.scale.set(1.05, 1.0, 0.75);
   return nose;
 }
@@ -292,7 +292,7 @@ function buildMouth(): THREE.Mesh {
     const ux = posAttr.getX(i);
     const uy = posAttr.getY(i);
     const ex = ux * 0.12;
-    const ey = uy * 0.065;
+    const ey = uy * 0.055;
     const edge = Math.min(1, ux * ux + uy * uy); // 中心0→縁1
     const r = R_CENTER - (R_CENTER - R_EDGE) * edge;
     const theta = ex / r;
@@ -312,7 +312,7 @@ function buildHand(side: 1 | -1): THREE.Group {
   // 丸みのある平板にし、指は根元同士が触れ合う間隔で深く食い込ませて
   // 全体がひとつながりのシルエットに見えるようにする。
   const palm = new THREE.Mesh(new THREE.SphereGeometry(0.25, 32, 32), mat);
-  palm.scale.set(1.0, 1.05, 0.22); // 厚みを抑えた平板
+  palm.scale.set(1.0, 1.0, 0.15); // 球感を消した平たいフェルト板
   palm.position.y = -0.24;
   palm.castShadow = true;
   group.add(palm);
@@ -324,9 +324,9 @@ function buildHand(side: 1 | -1): THREE.Group {
 
   // 長くしなやかな 4 本指。根元同士が触れる間隔＋深い食い込みで一枚に。
   for (let i = 0; i < 4; i++) {
-    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.058, 0.6, 6, 12), mat);
-    const fan = (i - 1.5) * 0.1; // 緩い開き
-    finger.position.set((i - 1.5) * 0.105, -0.6, 0);
+    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.056, 0.6, 6, 12), mat);
+    const fan = (i - 1.5) * 0.15; // パーに近い開き
+    finger.position.set((i - 1.5) * 0.11, -0.6, 0);
     finger.rotation.z = -fan;
     finger.scale.z = 0.55; // 指も平たく
     finger.castShadow = true;
@@ -360,7 +360,7 @@ function buildArm(side: 1 | -1): THREE.Group {
   const hand = buildHand(side);
   hand.position.y = -1.68;
   // 手のひらはやや体側へ。正面からも開いた指が見える程度に留める。
-  hand.rotation.y = -side * 0.2;
+  hand.rotation.y = -side * 0.1;
   hand.scale.setScalar(1.05);
   group.add(hand);
 
@@ -425,8 +425,9 @@ export function createSunsunModel(): SunsunModelParts {
   head.add(eyeL, eyeR);
 
   // 鼻は目のすぐ下・中央。ファーに埋もれないよう毛先より前へ出す。
+  // 鼻は両目の接合部の直下に接するように。
   const nose = buildNose();
-  nose.position.set(0, 1.9, 0.46);
+  nose.position.set(0, 1.94, 0.46);
   head.add(nose);
 
   // 口は鼻の下、横に広く浅い開口。毛に埋もれず、突き出しすぎない位置に。
