@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { createSunsunModel, type FurRefMeta } from "./sunsunModel";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { createSunsunModel, type FurRefMeta, type SunsunModelParts } from "./sunsunModel";
 import type { PeriodKey } from "../talk/_utils/constants";
 
 // 時間帯ごとのステージの色味（トークUIと揃える）。
@@ -110,13 +111,23 @@ export function SunsunModel3D({
     scene.add(ground);
 
     // ---- スンスン本体 ----
-    const sunsun = createSunsunModel();
-    scene.add(sunsun.root);
-
-    // 実写リファレンス（公式ステッカー写真由来）でファーの色ムラを実物に寄せる。
-    // ロード失敗時は手続き的なティントのまま表示する。
+    // Blender製ボディ（凹んだ口＋口パクシェイプキー）を読み込んでから組み立てる。
+    // GLBやリファレンスのロードに失敗しても手続き版で動くようにする。
     let disposed = false;
+    let sunsun: SunsunModelParts | null = null;
     (async () => {
+      let glbBody: THREE.Object3D | undefined;
+      try {
+        const gltf = await new GLTFLoader().loadAsync("/assets/model/sunsun-body.glb");
+        glbBody = gltf.scene;
+      } catch {
+        // フォールバック: 手続き版ボディ
+      }
+      if (disposed) return;
+      sunsun = createSunsunModel(glbBody);
+      scene.add(sunsun.root);
+
+      // 実写リファレンス（公式ステッカー写真由来）でファーの色ムラを実物に寄せる。
       try {
         const res = await fetch("/assets/model/fur-ref.json");
         if (!res.ok) return;
@@ -124,7 +135,7 @@ export function SunsunModel3D({
         const image = new Image();
         image.src = "/assets/model/fur-ref.png";
         await image.decode();
-        if (!disposed) sunsun.applyFurReference(image, meta);
+        if (!disposed && sunsun) sunsun.applyFurReference(image, meta);
       } catch {
         // リファレンス無しでも動作に支障はない
       }
@@ -158,45 +169,46 @@ export function SunsunModel3D({
     // ---- アニメーション ----
     const clock = new THREE.Clock();
     let raf = 0;
-    // 口の閉じた状態の基準スケール。
-    const mouthBaseY = sunsun.mouth.scale.y;
+    // 口の開き具合（0..1）。閉じるときは滑らかに戻す。
+    let mouthOpen = 0;
 
     function tick() {
       raf = requestAnimationFrame(tick);
       const t = clock.getElapsedTime();
 
-      // 呼吸するような上下のゆれ（立ち姿なので控えめに、足が浮かない程度）。
-      sunsun.root.position.y = Math.sin(t * 1.4) * 0.015;
-      sunsun.root.rotation.z = Math.sin(t * 0.9) * 0.012;
+      if (sunsun) {
+        // 呼吸するような上下のゆれ（立ち姿なので控えめに、足が浮かない程度）。
+        sunsun.root.position.y = Math.sin(t * 1.4) * 0.015;
+        sunsun.root.rotation.z = Math.sin(t * 0.9) * 0.012;
 
-      // 頭を少しかしげる。
-      sunsun.head.rotation.z = Math.sin(t * 0.8 + 0.5) * 0.03;
-      sunsun.head.rotation.x = Math.sin(t * 1.1) * 0.02;
+        // 頭を少しかしげる。
+        sunsun.head.rotation.z = Math.sin(t * 0.8 + 0.5) * 0.03;
+        sunsun.head.rotation.x = Math.sin(t * 1.1) * 0.02;
 
-      // グーグリーアイのぷるぷる。
-      sunsun.eyes.forEach((eye, i) => {
-        const p = t * 2.3 + i * 1.7;
-        eye.rotation.x = Math.sin(p) * 0.06;
-        eye.rotation.z = Math.cos(p * 0.8) * 0.05 + (i === 0 ? 0.1 : -0.13);
-      });
+        // グーグリーアイのぷるぷる。
+        sunsun.eyes.forEach((eye, i) => {
+          const p = t * 2.3 + i * 1.7;
+          eye.rotation.x = Math.sin(p) * 0.06;
+          eye.rotation.z = Math.cos(p * 0.8) * 0.05 + (i === 0 ? 0.1 : -0.13);
+        });
 
-      // 腕をゆらゆら。
-      sunsun.arms.forEach((arm, i) => {
-        const dir = i === 0 ? 1 : -1;
-        arm.rotation.x = THREE.MathUtils.degToRad(-8) + Math.sin(t * 1.3 + i) * 0.08 * dir;
-      });
+        // 腕をゆらゆら。
+        sunsun.arms.forEach((arm, i) => {
+          const dir = i === 0 ? 1 : -1;
+          arm.rotation.x = THREE.MathUtils.degToRad(-8) + Math.sin(t * 1.3 + i) * 0.08 * dir;
+        });
 
-      // 口パク。口は体表に沿った球面パッチなので、縦(scale.y)だけ開閉する
-      // （scale.z を変えるとパッチが体内に沈んで消えるため触らない）。
-      if (talkingRef.current) {
-        const open = (Math.sin(t * 16) * 0.5 + 0.5) ** 1.5;
-        sunsun.mouth.scale.y = mouthBaseY * (0.85 + open * 1.1);
-      } else {
-        sunsun.mouth.scale.y += (mouthBaseY - sunsun.mouth.scale.y) * 0.15;
+        // 口パク（0..1）。GLBボディならシェイプキー、手続き版ならデカールの縦開き。
+        if (talkingRef.current) {
+          mouthOpen = (Math.sin(t * 16) * 0.5 + 0.5) ** 1.5;
+        } else {
+          mouthOpen += (0 - mouthOpen) * 0.15;
+        }
+        sunsun.setMouthOpen(mouthOpen);
+
+        // もこもこON/OFF。
+        sunsun.fur.visible = fluffyRef.current;
       }
-
-      // もこもこON/OFF。
-      sunsun.fur.visible = fluffyRef.current;
 
       controls.autoRotate = autoRotateRef.current;
       controls.autoRotateSpeed = 1.1;

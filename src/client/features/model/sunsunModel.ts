@@ -34,8 +34,11 @@ export interface SunsunModelParts {
   head: THREE.Group;
   /** 左右の白目（グーグリーアイ）。アイドル時に微妙に揺れる */
   eyes: THREE.Group[];
-  /** 口の開閉に使うメッシュ */
-  mouth: THREE.Mesh;
+  /**
+   * 口の開き具合を 0(閉)〜1(全開) で設定する。
+   * GLBボディではシェイプキー、フォールバックのデカール口では scale.y を駆動。
+   */
+  setMouthOpen: (open: number) => void;
   /** 腕(左右)。軽く揺らす */
   arms: THREE.Group[];
   /** 体のファー（毛束の InstancedMesh）。visible でもこもこON/OFF */
@@ -197,11 +200,10 @@ function buildFur(body: THREE.Mesh): { fur: THREE.InstancedMesh; tufts: TuftData
     const dEyeR = p.distanceTo(EYE_R_POS);
     if (dEyeL < 0.145 || dEyeR < 0.145) continue;
     if (p.distanceTo(NOSE_POS) < 0.11) continue;
-    // 口デカール（半幅0.16・半高0.085）よりひと回り狭い範囲だけ毛を避ける。
-    // デカールが無毛域を完全に覆い隠し、外周の毛が縁に被さる。
-    // 口デカールの内側に毛先が突き抜けると「歯のような斑点」に見えるため、
-    // デカール（半幅0.115）より一回り狭い範囲をしっかり無毛にする。
-    if (Math.abs(p.y - 1.75) < 0.05 && Math.abs(p.x) < 0.095 && p.z > 0.25) continue;
+    // 口（GLBボディの凹み楕円: 半幅0.115・半高0.055）の内側と縁に毛先が
+    // 入り込むと「歯のような斑点」に見える。毛は下向きに垂れるため、
+    // 開口の上側は特に広めに無毛にする（垂れた毛先が開口を横切らない距離）。
+    if (p.y > 1.665 && p.y < 1.845 && Math.abs(p.x) < 0.14 && p.z > 0.2) continue;
 
     // 顔の正面上部は短毛にして、目・鼻・口が読めるようにする（無毛地帯は作らない）。
     // 二値ではなく滑らかなグラデーションで移行し、胴との「継ぎ目」を作らない。
@@ -218,7 +220,7 @@ function buildFur(body: THREE.Mesh): { fur: THREE.InstancedMesh; tufts: TuftData
     // （短くしすぎると刈り込み跡に見えるので控えめに）。
     if (Math.abs(p.y - 1.755) < 0.2 && p.z > 0.1) lengthScale *= 0.8;
     // 口の直近リングはさらに短くして、毛が開口へ被らないようにする。
-    if (Math.abs(p.y - 1.755) < 0.12 && p.z > 0.2) lengthScale *= 0.7;
+    if (Math.abs(p.y - 1.755) < 0.14 && p.z > 0.2) lengthScale *= 0.55;
     // 頭頂は毛をやや長めにして地肌の露出を埋める（長すぎると寝た毛軸の
     // 根元色が真上に大きく露出して濃紺の斑になるため控えめに）。
     if (n.y > 0.4) lengthScale *= 1.2;
@@ -594,14 +596,77 @@ function buildLeg(side: 1 | -1): THREE.Group {
 }
 
 /**
- * スンスン一体を組み立てて返す。root をシーンに add すれば良い。
- * head / eyes / mouth / arms はアニメーション用の参照。
+ * Blender製 GLB ボディ（sunsun-body.glb）から、ファー植毛用の skin メッシュと
+ * 口シェイプキーの参照を取り出し、マテリアルを設定する。
+ * glTF はマテリアルごとにプリミティブ分割されるため、skin / mouth の
+ * 2 メッシュ構成になっている。
  */
-export function createSunsunModel(): SunsunModelParts {
+function prepareGlbBody(glb: THREE.Object3D): {
+  group: THREE.Object3D;
+  skinMesh: THREE.Mesh;
+  setMouthOpen: (open: number) => void;
+} | null {
+  let skinMesh: THREE.Mesh | null = null;
+  const morphMeshes: THREE.Mesh[] = [];
+  glb.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    obj.castShadow = true;
+    obj.receiveShadow = true;
+    const matName = (obj.material as THREE.Material).name;
+    if (matName === "mouth") {
+      // 口腔の内側。ライティングで灰色に浮かないよう非ライトの黒。
+      obj.material = new THREE.MeshBasicMaterial({
+        color: new THREE.Color("#131110"),
+        side: THREE.DoubleSide,
+      });
+    } else {
+      // 地肌: 手続き版と同じ起毛（sheen）マテリアル。
+      obj.material = new THREE.MeshPhysicalMaterial({
+        color: new THREE.Color(SKIN_BASE),
+        roughness: 0.95,
+        metalness: 0,
+        sheen: 1.0,
+        sheenColor: new THREE.Color(SKY_LIGHT),
+        sheenRoughness: 0.55,
+      });
+      skinMesh = obj;
+    }
+    if (obj.morphTargetDictionary && "mouthOpen" in obj.morphTargetDictionary) {
+      morphMeshes.push(obj);
+    }
+  });
+  if (!skinMesh) return null;
+  const setMouthOpen = (open: number) => {
+    for (const m of morphMeshes) {
+      const idx = m.morphTargetDictionary!["mouthOpen"];
+      if (m.morphTargetInfluences) m.morphTargetInfluences[idx] = open;
+    }
+  };
+  return { group: glb, skinMesh, setMouthOpen };
+}
+
+/**
+ * スンスン一体を組み立てて返す。root をシーンに add すれば良い。
+ * head / eyes / arms はアニメーション用の参照。
+ *
+ * glbBody に Blender 製ボディ（sunsun-body.glb のシーン）を渡すと、
+ * ラテ+デカール口の手続き版の代わりに、本当に凹んだ口とシェイプキーの
+ * 口パクを持つメッシュを使う。省略時/失敗時は従来の手続き版。
+ */
+export function createSunsunModel(glbBody?: THREE.Object3D): SunsunModelParts {
   const root = new THREE.Group();
 
-  const body = buildBody();
-  root.add(body);
+  const prepared = glbBody ? prepareGlbBody(glbBody) : null;
+
+  let body: THREE.Mesh;
+  let setMouthOpen: (open: number) => void;
+  if (prepared) {
+    root.add(prepared.group);
+    body = prepared.skinMesh;
+  } else {
+    body = buildBody();
+    root.add(body);
+  }
 
   // 体のファー（もこもこ）。visible の切り替えでツルッと版と比較できる。
   const { fur, tufts } = buildFur(body);
@@ -633,14 +698,20 @@ export function createSunsunModel(): SunsunModelParts {
   nose.position.set(0, 1.94, 0.46);
   head.add(nose);
 
-  // 口は鼻の下、横に広く浅い開口。毛に埋もれず、突き出しすぎない位置に。
-  // 口パッチの球中心を体の軸上（口の高さ）に置くと、体表に沿って湾曲する。
-  // 実物どおり鼻のすぐ下に。
-  // 上げすぎると鼻ボタンが口の中央を正面から隠し「二重の口」に見えるので、
-  // 鼻の下端ぎりぎりの高さに置く。
-  const mouth = buildMouth();
-  mouth.position.set(0, 1.755, 0);
-  head.add(mouth);
+  // 口。GLBボディでは凹んだ開口＋シェイプキーが既にあるため何も足さない。
+  // フォールバックの手続き版のみ、体表に沿う楕円デカールを鼻のすぐ下に貼る
+  // （上げすぎると鼻ボタンが口の中央を正面から隠し「二重の口」に見える）。
+  if (prepared) {
+    setMouthOpen = prepared.setMouthOpen;
+  } else {
+    const mouth = buildMouth();
+    mouth.position.set(0, 1.755, 0);
+    head.add(mouth);
+    const baseY = mouth.scale.y;
+    setMouthOpen = (open) => {
+      mouth.scale.y = baseY * (0.85 + open * 1.1);
+    };
+  }
 
   // ---- 長い腕（肩は筒の上から約 1/3 の側面。体側に沿ってまっすぐ垂らす） ----
   // ファーの外側に腕のラインが見えるよう、肩をやや外に出す。
@@ -671,7 +742,7 @@ export function createSunsunModel(): SunsunModelParts {
     root,
     head,
     eyes: [eyeL, eyeR],
-    mouth,
+    setMouthOpen,
     arms: [armL, armR],
     fur,
     applyFurReference: (image, meta) => applyFurReferenceToInstances(fur, tufts, image, meta),
