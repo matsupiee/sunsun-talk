@@ -18,8 +18,8 @@ import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.j
 // ---- パレット（実物の配色を参考に） ----------------------------------------
 const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
-const FUR_ROOT = "#3577de"; // 毛束の根元〜中間（鮮やかな深いブルー）
-const FUR_TIP = "#c5e3fc"; // 毛束の毛先（白っぽい空色のチップ）
+const FUR_ROOT = "#2e72de"; // 毛束の根元〜中間（鮮やかな深いブルー）
+const FUR_TIP = "#b5dcfa"; // 毛束の毛先（明るい空色のチップ。白すぎない）
 const SKIN_BASE = "#4c8be0"; // 毛の隙間から見える地肌（鮮やかなブルー）
 const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
 const PUPIL = "#141210"; // 黒目・鼻・口の黒
@@ -117,7 +117,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
   for (let i = 0; i < pos.count; i++) {
     const t = THREE.MathUtils.clamp(pos.getY(i), 0, 1);
     // 白化は毛先寄りに限定しつつ、中間色は鮮やかな青を保つ。
-    c.copy(rootColor).lerp(tipColor, Math.pow(t, 2.6));
+    c.copy(rootColor).lerp(tipColor, Math.pow(t, 2.8));
     colors[i * 3] = c.r;
     colors[i * 3 + 1] = c.g;
     colors[i * 3 + 2] = c.b;
@@ -157,8 +157,13 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     if (Math.abs(p.y - 1.71) < 0.045 && Math.abs(p.x) < 0.1 && p.z > 0.25) continue;
 
     // 顔の正面上部は短毛にして、目・鼻・口が読めるようにする（無毛地帯は作らない）。
-    const nearFace = p.y > 1.45 && p.z > 0.05;
-    let lengthScale = nearFace ? 0.62 : 1.0;
+    // 二値ではなく滑らかなグラデーションで移行し、胴との「継ぎ目」を作らない。
+    const faceT =
+      THREE.MathUtils.smoothstep(p.y, 1.3, 1.75) *
+      THREE.MathUtils.smoothstep(p.z, -0.05, 0.25) *
+      (0.8 + Math.random() * 0.4);
+    const nearFace = faceT > 0.5;
+    let lengthScale = 1.0 - 0.38 * Math.min(1, faceT);
     // 目のすぐ近くはさらに短毛にして、白目が毛の上に半分埋まって見えるようにする。
     if (dEyeL < 0.3 || dEyeR < 0.3) lengthScale *= 0.45;
     // 口の周囲リングもやや短毛にして、毛が開口に垂れて口を隠さないようにする
@@ -206,7 +211,8 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     // わずかに青へ寄せて、強い光でも水色の印象が飛ばないようにする。
     // 短毛（顔まわり）は根元の暗色が支配的になるため明るめに補正する。
     let v = 0.88 + Math.random() * 0.12;
-    if (lengthScale < 0.75) v *= 1.28;
+    // 短毛ほど根元の暗色が支配的になるため、顔の度合いに応じて滑らかに明るく。
+    v *= 1 + 0.3 * Math.min(1, faceT);
     fur.setColorAt(placed, tint.setRGB(v * 0.95, v * 0.98, v * 1.03));
     placed++;
   }
@@ -336,7 +342,7 @@ function buildHand(side: 1 | -1): THREE.Group {
   // 太く平たい 4 本指。隙間は狭く、根元はナックル板に食い込ませて連続させる。
   for (let i = 0; i < 4; i++) {
     const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.068, 0.6, 6, 12), mat);
-    const fan = (i - 1.5) * 0.08; // 控えめな開き
+    const fan = (i - 1.5) * 0.1; // 控えめな開き
     finger.position.set((i - 1.5) * 0.122, -0.72, 0);
     finger.rotation.z = -fan;
     finger.scale.z = 0.58; // 断面を扁平に（先端は丸く残す）
