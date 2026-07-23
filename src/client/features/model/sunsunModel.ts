@@ -252,7 +252,11 @@ function buildNose(): THREE.Mesh {
   return nose;
 }
 
-/** 横に広い浅い口。軽く開いた黒い開口（しゃべる時は縦に開く）。 */
+/**
+ * 横に広い浅い口。体表（この高さの半径 ≒0.44）と同じ曲率で湾曲する
+ * 薄い球面パッチとして表現し、くちばし状に突き出さないようにする。
+ * 球の中心を体の軸上（口の高さ）に置くこと。しゃべる時は scale.y で縦に開く。
+ */
 function buildMouth(): THREE.Mesh {
   const mat = new THREE.MeshStandardMaterial({
     color: new THREE.Color(PUPIL),
@@ -261,13 +265,9 @@ function buildMouth(): THREE.Mesh {
     metalness: 0.0,
     side: THREE.DoubleSide,
   });
-  const geo = new THREE.SphereGeometry(0.24, 40, 40);
-  const mouth = new THREE.Mesh(geo, mat);
-  // 横に広く、少し縦にも開いた浅い開口。唇状に突き出さないよう奥行きを強くつぶす。
-  mouth.scale.set(1.2, 0.56, 0.16);
-  // 上辺をわずかに後ろへ倒し、軽く開いた口に見せる。
-  mouth.rotation.x = 0.25;
-  return mouth;
+  // 幅 ≒0.56・高さ ≒0.27 の前面パッチ（+z 向き）。
+  const geo = new THREE.SphereGeometry(0.452, 48, 24, Math.PI / 2 - 0.62, 1.24, Math.PI / 2 - 0.3, 0.6);
+  return new THREE.Mesh(geo, mat);
 }
 
 /** 指の分かれた大きな黒いフェルトの手。 */
@@ -389,10 +389,9 @@ export function createSunsunModel(): SunsunModelParts {
   head.add(nose);
 
   // 口は鼻の下、横に広く浅い開口。毛に埋もれず、突き出しすぎない位置に。
-  // 体表（この高さの半径 ≒0.44）からわずかに前へ出るだけの位置に置き、
-  // 「面に開いた浅い開口」に見せる（奥に沈めると欠けて見える）。
+  // 口パッチの球中心を体の軸上（口の高さ）に置くと、体表に沿って湾曲する。
   const mouth = buildMouth();
-  mouth.position.set(0, 1.68, 0.42);
+  mouth.position.set(0, 1.68, 0);
   head.add(mouth);
 
   // ---- 長い腕（肩は筒の上から約 1/3 の側面。体側に沿ってまっすぐ垂らす） ----

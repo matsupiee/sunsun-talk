@@ -168,14 +168,13 @@ export function SunsunModel3D({
         arm.rotation.x = THREE.MathUtils.degToRad(-8) + Math.sin(t * 1.3 + i) * 0.08 * dir;
       });
 
-      // 口パク。しゃべっている間は速く大きく、そうでなければ基準に戻す。
+      // 口パク。口は体表に沿った球面パッチなので、縦(scale.y)だけ開閉する
+      // （scale.z を変えるとパッチが体内に沈んで消えるため触らない）。
       if (talkingRef.current) {
         const open = (Math.sin(t * 16) * 0.5 + 0.5) ** 1.5;
-        sunsun.mouth.scale.y = mouthBaseY * (0.85 + open * 1.4);
-        sunsun.mouth.scale.z = 0.7 + open * 0.35;
+        sunsun.mouth.scale.y = mouthBaseY * (0.85 + open * 1.1);
       } else {
         sunsun.mouth.scale.y += (mouthBaseY - sunsun.mouth.scale.y) * 0.15;
-        sunsun.mouth.scale.z += (0.7 - sunsun.mouth.scale.z) * 0.15;
       }
 
       // もこもこON/OFF。
