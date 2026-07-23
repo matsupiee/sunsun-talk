@@ -18,9 +18,9 @@ import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.j
 // ---- パレット（実物の配色を参考に） ----------------------------------------
 const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
 const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
-const FUR_ROOT = "#4e86dd"; // 毛束の根元〜中間（鮮やかな深めのブルー）
-const FUR_TIP = "#b5daf9"; // 毛束の毛先（明るい空色）
-const SKIN_BASE = "#6ba0e6"; // 毛の隙間から見える地肌（鮮やかなブルー）
+const FUR_ROOT = "#3f7edb"; // 毛束の根元〜中間（鮮やかな深めのブルー）
+const FUR_TIP = "#a8d4f8"; // 毛束の毛先（明るい空色）
+const SKIN_BASE = "#5f97e4"; // 毛の隙間から見える地肌（鮮やかなブルー）
 const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
 const PUPIL = "#141210"; // 黒目・鼻・口の黒
 const LIMB_DARK = "#121216"; // 黒に近い腕・脚・手足
@@ -183,10 +183,10 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
         Math.cos(p.x * 5.5 + p.y * 4.6) * 0.7 + (Math.random() - 0.5) * 0.22,
       )
       .multiplyScalar(0.45);
-    const crownDroop = Math.max(0, n.y) * 0.8; // 上向き法線ほど追加で寝かせる
+    const crownDroop = Math.max(0, n.y) * 0.85; // 上向き法線ほど追加で寝かせる
     dir
       .copy(n)
-      .addScaledVector(down, 0.95 + crownDroop + Math.random() * 0.4)
+      .addScaledVector(down, 1.1 + crownDroop + Math.random() * 0.4)
       .add(jitter)
       .normalize();
     quat.setFromUnitVectors(up, dir);
@@ -261,6 +261,7 @@ function buildNose(): THREE.Mesh {
     // 布張りなのでプラスチックほどつやを出さない。
     roughness: 0.55,
   });
+  mat.roughness = 0.78; // マットな布の質感
   const nose = new THREE.Mesh(new THREE.SphereGeometry(0.105, 32, 32), mat);
   nose.scale.set(1.05, 1.0, 0.75);
   return nose;
@@ -290,8 +291,8 @@ function buildMouth(): THREE.Mesh {
   for (let i = 0; i < posAttr.count; i++) {
     const ux = posAttr.getX(i);
     const uy = posAttr.getY(i);
-    const ex = ux * 0.16;
-    const ey = uy * 0.085;
+    const ex = ux * 0.14;
+    const ey = uy * 0.07;
     const edge = Math.min(1, ux * ux + uy * uy); // 中心0→縁1
     const r = R_CENTER - (R_CENTER - R_EDGE) * edge;
     const theta = ex / r;
@@ -307,31 +308,31 @@ function buildHand(side: 1 | -1): THREE.Group {
   const mat = skinMaterial(LIMB_DARK);
   mat.roughness = 0.85;
 
-  // 実物の手は「一枚の平たい黒フェルトの手袋」。丸い手のひらの塊は無く、
-  // 手首から幅が広がる平たいくさび形に、長い指がつながる。
-  const palm = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.09, 0.34, 24), mat);
-  palm.scale.z = 0.3; // 平たく
-  palm.position.y = -0.17;
+  // 実物の手は「一枚の平たい黒フェルトの手袋」。手首から幅が広がる
+  // 平たい面に、長い指が根元でつながって連続する（棒の寄せ集めにしない）。
+  const palm = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.12, 0.42, 24), mat);
+  palm.scale.z = 0.32; // 平たく
+  palm.position.y = -0.21;
   palm.castShadow = true;
   group.add(palm);
 
-  // 長くしなやかな 4 本指を、扇状にはっきり開く（実物のポーズに合わせる）。
+  // 長い 4 本指。根元を手のひら面に食い込ませて一枚につなげ、緩く開く。
   for (let i = 0; i < 4; i++) {
-    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.048, 0.5, 6, 12), mat);
-    const fan = (i - 1.5) * 0.17; // しっかり開く
-    finger.position.set((i - 1.5) * 0.105, -0.56, 0);
-    finger.position.x += Math.sin(fan) * 0.12;
+    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.44, 6, 12), mat);
+    const fan = (i - 1.5) * 0.12; // 緩く開く
+    finger.position.set((i - 1.5) * 0.118, -0.52, 0);
+    finger.position.x += Math.sin(fan) * 0.1;
     finger.rotation.z = -fan;
-    finger.scale.z = 0.7; // 指も平たく
+    finger.scale.z = 0.62; // 指も平たく
     finger.castShadow = true;
     group.add(finger);
   }
 
   // 親指は大きく横へ開く（実物は親指の分離が目立つ）。
-  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.052, 0.32, 6, 12), mat);
-  thumb.position.set(side * 0.24, -0.3, 0);
-  thumb.rotation.z = side * 0.95;
-  thumb.scale.z = 0.7;
+  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.062, 0.3, 6, 12), mat);
+  thumb.position.set(side * 0.26, -0.28, 0);
+  thumb.rotation.z = side * 0.9;
+  thumb.scale.z = 0.62;
   thumb.castShadow = true;
   group.add(thumb);
 
