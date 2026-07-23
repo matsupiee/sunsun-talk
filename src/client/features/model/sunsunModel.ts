@@ -116,10 +116,10 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
   const c = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
     const t = THREE.MathUtils.clamp(pos.getY(i), 0, 1);
-    // 白化は毛先寄りに限定しつつ、中間色は鮮やかな青を保つ。
-    // 指数を下げすぎると全体が白く飛び、上げすぎると根元の紺が支配して
-    // 頭頂が濃い斑に見える。中間の明るい青が最も長く見える値にする。
-    c.copy(rootColor).lerp(tipColor, Math.pow(t, 1.9));
+    // 白化は毛先の2〜3割に限定し、中腹までは鮮やかな青を保つ
+    // （指数が低いと全体が白く飛んでラベンダー/グレー寄りに見える）。
+    // 頭頂の根元露出はインスタンス色の明度補正側で相殺する。
+    c.copy(rootColor).lerp(tipColor, Math.pow(t, 2.6));
     colors[i * 3] = c.r;
     colors[i * 3 + 1] = c.g;
     colors[i * 3 + 2] = c.b;
@@ -221,7 +221,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     // 短毛ほど根元の暗色が支配的になるため、顔の度合いに応じて滑らかに明るく。
     v *= 1 + 0.35 * Math.min(1, faceT);
     // 頭頂（上向き法線）は真上から根元が見えて暗く沈みやすいので少し持ち上げる。
-    v *= 1 + 0.25 * Math.max(0, n.y);
+    v *= 1 + 0.32 * Math.max(0, n.y);
     // 赤成分を下げて青の彩度を保つ（グレー寄りに washed out させない）。
     // ただし顔の短毛は根元の濃青が支配的で「顔だけ濃いパッチ」に見えるため、
     // 顔の度合いに応じて乗算色を白側へ寄せ、体側の毛先色と揃える。
@@ -356,12 +356,12 @@ function buildHand(side: 1 | -1): THREE.Group {
 
   // 長くしなやかな 4 本指。実際の手のように指ごとに長さを変えて有機的に。
   // 実物写真の「長い指が軽く開く」印象に合わせ、長め＋やや細め＋広めの放射。
-  const fingerLens = [0.68, 0.78, 0.8, 0.65]; // 人差し指〜小指相当
+  const fingerLens = [0.85, 0.98, 1.0, 0.82]; // 人差し指〜小指相当（手の過半を指が占める）
   for (let i = 0; i < 4; i++) {
     // 細いと熊手状に見えるため、フェルトらしい厚みのある太さにする。
     const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.082, fingerLens[i], 6, 12), mat);
     // 開きすぎると熊手状に見えるので、根元は寄せて先だけ軽く開く。
-    const fan = (i - 1.5) * 0.15;
+    const fan = (i - 1.5) * 0.17;
     finger.position.set((i - 1.5) * 0.15, -0.66 - fingerLens[i] * 0.08, 0);
     finger.rotation.z = -fan;
     finger.scale.z = 0.42; // 断面を扁平に（丸棒でなく平リボンのフェルト感）
@@ -370,7 +370,7 @@ function buildHand(side: 1 | -1): THREE.Group {
   }
 
   // 親指は長めにして、手のひらからはっきり分岐させる。
-  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.48, 6, 12), mat);
+  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.58, 6, 12), mat);
   thumb.position.set(side * 0.29, -0.34, 0);
   thumb.rotation.z = side * 0.8;
   thumb.scale.z = 0.42;
@@ -387,14 +387,14 @@ function buildArm(side: 1 | -1): THREE.Group {
   mat.roughness = 0.95;
 
   // 細長い腕（全身の約半分の長さ・筒幅の約 1/6 の太さ）。
-  const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 1.7, 20), mat);
-  upper.position.y = -0.84;
+  const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 1.55, 20), mat);
+  upper.position.y = -0.775;
   upper.castShadow = true;
   group.add(upper);
 
   // 手の原点は手首（腕の末端）。そこから手袋が下に伸びる。
   const hand = buildHand(side);
-  hand.position.y = -1.68;
+  hand.position.y = -1.53;
   // 手のひらはやや体側へ。正面からも開いた指が見える程度に留める。
   hand.rotation.y = -side * 0.1;
   hand.scale.setScalar(1.05);
