@@ -154,7 +154,7 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
     if (p.distanceTo(NOSE_POS) < 0.11) continue;
     // 口デカール（半幅0.16・半高0.085）よりひと回り狭い範囲だけ毛を避ける。
     // デカールが無毛域を完全に覆い隠し、外周の毛が縁に被さる。
-    if (Math.abs(p.y - 1.71) < 0.045 && Math.abs(p.x) < 0.1 && p.z > 0.25) continue;
+    if (Math.abs(p.y - 1.71) < 0.04 && Math.abs(p.x) < 0.09 && p.z > 0.25) continue;
 
     // 顔の正面上部は短毛にして、目・鼻・口が読めるようにする（無毛地帯は作らない）。
     // 二値ではなく滑らかなグラデーションで移行し、胴との「継ぎ目」を作らない。
@@ -192,11 +192,11 @@ function buildFur(body: THREE.Mesh): THREE.InstancedMesh {
       )
       .multiplyScalar(0.4);
     const crownDroop = Math.max(0, n.y) * 0.85; // 上向き法線ほど追加で寝かせる
-    // 2割の毛は垂れを弱めて外へ広げ、ふわっとした輪郭を作る。
-    const fluffOut = Math.random() < 0.2 ? 0.6 : 1.0;
+    // 長い差し毛ほど重力で強く垂れる（ウニ状の逆立ちを避ける）。
+    const guardDroop = guardHair ? 0.5 : 0;
     dir
       .copy(n)
-      .addScaledVector(down, (1.35 + crownDroop + Math.random() * 0.4) * fluffOut)
+      .addScaledVector(down, 1.35 + crownDroop + guardDroop + Math.random() * 0.4)
       .add(jitter)
       .normalize();
     quat.setFromUnitVectors(up, dir);
@@ -341,18 +341,19 @@ function buildHand(side: 1 | -1): THREE.Group {
 
   // 太く平たい 4 本指。隙間は狭く、根元はナックル板に食い込ませて連続させる。
   for (let i = 0; i < 4; i++) {
-    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.068, 0.6, 6, 12), mat);
+    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.066, 0.62, 6, 12), mat);
     const fan = (i - 1.5) * 0.12; // 自然に開く
-    finger.position.set((i - 1.5) * 0.122, -0.72, 0);
+    // 根元の食い込みを浅くして、指と指のあいだに実際の隙間を見せる。
+    finger.position.set((i - 1.5) * 0.128, -0.68, 0);
     finger.rotation.z = -fan;
     finger.scale.z = 0.5; // 断面を扁平に（フェルトの薄さ）
     finger.castShadow = true;
     group.add(finger);
   }
 
-  // 親指だけははっきり分離して大きく横へ。
-  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.064, 0.34, 6, 12), mat);
-  thumb.position.set(side * 0.27, -0.36, 0);
+  // 親指は長めにして、手のひらからはっきり分岐させる。
+  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.064, 0.4, 6, 12), mat);
+  thumb.position.set(side * 0.29, -0.34, 0);
   thumb.rotation.z = side * 0.8;
   thumb.scale.z = 0.5;
   thumb.castShadow = true;
