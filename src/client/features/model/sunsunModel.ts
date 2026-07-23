@@ -274,9 +274,10 @@ function buildMouth(): THREE.Mesh {
   // 単位円 → 半幅0.32・半高0.16 の楕円にし、x を弧長として筒面に巻き付ける。
   // この高さの体表半径は ≒0.458。中央は毛の垂れに隠れないよう外へ出し、
   // 縁は体内へ沈むレンズ状にして、横から見ても縁が浮かないようにする。
-  // 地肌(≒0.458)より上・毛の垂れ(≒0.5)より中央は上、縁だけ毛の中へ。
+  // 地肌(≒0.458)より上・毛の垂れ(≒0.5)より中央は上。縁の沈み込みは
+  // 毛の垂れ境界までに留め、視点が回っても口が欠けないようにする。
   const R_CENTER = 0.52;
-  const R_EDGE = 0.465;
+  const R_EDGE = 0.5;
   const geo = new THREE.CircleGeometry(1, 48);
   const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
   for (let i = 0; i < posAttr.count; i++) {
