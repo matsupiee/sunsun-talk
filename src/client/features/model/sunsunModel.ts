@@ -1,0 +1,812 @@
+import * as THREE from "three";
+import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.js";
+
+/**
+ * パペット「スンスン」の 3D モデルをプリミティブから手続き的に組み立てる。
+ *
+ * 水色の体は InstancedMesh で数万本の毛束を植えてファーの「もこもこ感」を
+ * 再現する（地肌には sheen の起毛光沢）。腕・脚・手足・目・鼻・口は
+ * 実物どおりフェルト／プラスチック調のツルッとした表面のまま。
+ *
+ * 全身のプロポーション（全身写真から）:
+ * - 水色の体は「細長い筒」状で、幅は全身の高さの約 1/4。頭と胴の区別は無い。
+ * - 顔（小さな白目×2・黒い丸鼻・横に広い口）は筒の最上部に小さくまとまる。
+ * - 黒い腕は非常に長く（全身の約半分）、指の分かれた大きな手が付く。
+ * - 筒の下から太めの黒い脚が 2 本出て、大きく丸い黒い足で立つ。
+ */
+
+// ---- パレット（実物の配色を参考に） ----------------------------------------
+const SKY = "#a5c6f7"; // 体のベースになる水色（明るいペリウィンクル水色）
+const SKY_LIGHT = "#c9def8"; // ハイライト用の明るい水色
+const FUR_ROOT = "#2b63ea"; // 毛束の根元〜中間（鮮やかなコバルト寄りブルー）
+// ファーの外殻はほぼ毛先で構成されるため「見た目の体色 ≒ 毛先色」。
+// 毛先を白にすると全体が退色したラベンダーに見えるので、明るいが
+// 明確に青いチップにする（白っぽさは明度ゆらぎで少量だけ乗る）。
+const FUR_TIP = "#a8cdfb"; // 毛束の毛先（明るい空色のチップ）
+const SKIN_BASE = "#6f9cf0"; // 毛の隙間から見える地肌（中間の明るいブルー）
+const EYE_WHITE = "#fdfdf7"; // ほぼ白の白目
+const PUPIL = "#141210"; // 黒目・鼻・口の黒
+const LIMB_DARK = "#121216"; // 黒に近い腕・脚・手足
+
+export interface SunsunModelParts {
+  root: THREE.Group;
+  /** 顔（目・鼻・口）グループ。軽く揺らす */
+  head: THREE.Group;
+  /** 左右の白目（グーグリーアイ）。アイドル時に微妙に揺れる */
+  eyes: THREE.Group[];
+  /**
+   * 口の開き具合を 0(閉)〜1(全開) で設定する。
+   * GLBボディではシェイプキー、フォールバックのデカール口では scale.y を駆動。
+   */
+  setMouthOpen: (open: number) => void;
+  /** 腕(左右)。軽く揺らす */
+  arms: THREE.Group[];
+  /** 体のファー（毛束の InstancedMesh 群）。visible でもこもこON/OFF */
+  fur: THREE.Object3D;
+  /**
+   * 実写リファレンス（公式ステッカー写真から生成した展開テクスチャ）を
+   * 毛束ごとのティントに適用する。画像のロード完了後に呼ぶ。
+   */
+  applyFurReference: (image: HTMLImageElement, meta: FurRefMeta) => void;
+}
+
+/** fur-ref.json のマッピング情報（scripts で生成）。 */
+export interface FurRefMeta {
+  width: number;
+  height: number;
+  /** 展開テクスチャ上で鼻の高さに当たる行。 */
+  noseRow: number;
+  meanColor: [number, number, number];
+}
+
+function skinMaterial(color: string) {
+  // 腕・脚・手はフリース/フェルトの完全マット。Standard は roughness 1 でも
+  // 広いスペキュラが残ってプラスチックに見えるため、純拡散の Lambert。
+  return new THREE.MeshLambertMaterial({
+    color: new THREE.Color(color),
+  });
+}
+
+/** 水色のボディ。細長い筒状で、上端は丸いドーム。 */
+function buildBody(): THREE.Mesh {
+  // (半径, 高さ) の輪郭。下から上へ。幅は控えめ、縦に長く。
+  // 水色の筒は全身の上 2/3 に収め、下 1/3 は黒い脚に譲る。
+  // 太さはほぼ一定のまっすぐなチューブで、上端だけ丸いドーム。
+  const profile: Array<[number, number]> = [
+    [0.02, -0.32],
+    [0.25, -0.3],
+    [0.39, -0.22],
+    [0.45, -0.02],
+    [0.46, 0.3],
+    [0.465, 0.7], // ほぼ一定の太さ
+    [0.47, 1.1],
+    [0.47, 1.5],
+    [0.45, 1.8],
+    [0.41, 2.0],
+    [0.33, 2.14], // 上端は丸いドーム
+    [0.2, 2.23],
+    [0.02, 2.27],
+  ];
+
+  const points = profile.map(([r, y]) => new THREE.Vector2(r, y));
+  const geometry = new THREE.LatheGeometry(points, 64);
+  geometry.computeVertexNormals();
+
+  // 地肌は起毛（sheen）のある布マテリアル。毛束の隙間から見えても
+  // ファーの陰のように馴染む、やや深めの水色にする。
+  const material = new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(SKIN_BASE),
+    roughness: 0.95,
+    metalness: 0,
+    sheen: 1.0,
+    sheenColor: new THREE.Color(SKY_LIGHT),
+    sheenRoughness: 0.55,
+  });
+
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+// ---- ファー（毛束）--------------------------------------------------------
+
+/** 顔パーツの位置（毛を避ける・短くする判定に使う）。 */
+const EYE_L_POS = new THREE.Vector3(0.16, 2.14, 0.24);
+const EYE_R_POS = new THREE.Vector3(-0.16, 2.16, 0.24);
+const NOSE_POS = new THREE.Vector3(0, 1.94, 0.46);
+
+/**
+ * 体表面に数万本の毛束（先細りの小さな錐）を InstancedMesh で植える。
+ * - 根元→毛先で深い水色→白に近い水色のグラデーション（頂点カラー）
+ * - 法線方向＋下向きの「毛流れ」で、実物のやや垂れた長毛ファーに寄せる
+ * - 目・鼻・口のまわりは毛を避け、顔の正面は短毛にして表情を隠さない
+ */
+/** 毛束1本ごとの配置情報。実写ティントの再計算に使う。 */
+interface TuftData {
+  /** 体表のサンプル位置 */
+  px: Float32Array;
+  py: Float32Array;
+  pz: Float32Array;
+  /** 法線の上向き成分 */
+  ny: Float32Array;
+  /** 顔の度合い（0=胴, 1=顔正面） */
+  faceT: Float32Array;
+}
+
+/** ファーの構成メッシュ（胴体用・頭頂用）とその毛束データ。 */
+interface FurPart {
+  mesh: THREE.InstancedMesh;
+  tufts: TuftData;
+}
+
+/**
+ * 毛束テンプレート（根元を原点、+Y へ長さ1の細い錐）に
+ * 根元→毛先の頂点カラーグラデーションを焼き込む。
+ * rootMix > 0 で根元色を毛先色側へ寄せる（頭頂用: 寝た毛の軸が
+ * 真上から見えても濃紺の斑にならないよう、根元から明るい色にする）。
+ */
+function makeTuftGeometry(rootMix: number): THREE.BufferGeometry {
+  const geo = new THREE.ConeGeometry(1, 1, 4, 1, true);
+  geo.translate(0, 0.5, 0);
+  const pos = geo.getAttribute("position");
+  const colors = new Float32Array(pos.count * 3);
+  const tipColor = new THREE.Color(FUR_TIP);
+  const rootColor = new THREE.Color(FUR_ROOT).lerp(tipColor, rootMix);
+  const c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const t = THREE.MathUtils.clamp(pos.getY(i), 0, 1);
+    // 白化は毛先寄りに限定し、中腹までは青を保つ
+    // （指数が低いと全体が白く飛んでラベンダー/グレー寄りに見える）。
+    c.copy(rootColor).lerp(tipColor, Math.pow(t, 1.75));
+    colors[i * 3] = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  return geo;
+}
+
+function buildFur(body: THREE.Mesh): { fur: THREE.Group; parts: FurPart[] } {
+  const COUNT = 60000;
+  // 頭頂（上向き法線）の毛束はこの閾値で専用メッシュへ振り分ける。
+  const CROWN_NY = 0.35;
+
+  const mat = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.9,
+    metalness: 0,
+  });
+
+  interface TuftRec {
+    matrix: THREE.Matrix4;
+    r: number;
+    g: number;
+    b: number;
+    px: number;
+    py: number;
+    pz: number;
+    ny: number;
+    faceT: number;
+  }
+  const mainRecs: TuftRec[] = [];
+  const crownRecs: TuftRec[] = [];
+
+  const sampler = new MeshSurfaceSampler(body).build();
+  const p = new THREE.Vector3();
+  const n = new THREE.Vector3();
+  const dir = new THREE.Vector3();
+  const jitter = new THREE.Vector3();
+  const down = new THREE.Vector3(0, -1, 0);
+  const up = new THREE.Vector3(0, 1, 0);
+  const quat = new THREE.Quaternion();
+  const dummy = new THREE.Object3D();
+  const tint = new THREE.Color();
+
+  let placed = 0;
+  let guard = 0;
+  while (placed < COUNT && guard++ < COUNT * 40) {
+    sampler.sample(p, n);
+
+    // 頭頂ドームは真上から見ると毛の間の地肌が最も目立つため、
+    // 頭頂以外のサンプルを一部棄却して相対的に頭頂の植毛密度を上げる。
+    if (n.y < 0.35 && Math.random() < 0.22) continue;
+
+    // 目の球・鼻・口の輪郭ぎわ数ミリだけは毛を植えない（それ以外は頭頂まで生やす）。
+    const dEyeL = p.distanceTo(EYE_L_POS);
+    const dEyeR = p.distanceTo(EYE_R_POS);
+    if (dEyeL < 0.125 || dEyeR < 0.125) continue;
+    if (p.distanceTo(NOSE_POS) < 0.09) continue;
+    // 口（GLBボディの凹み楕円: 半幅0.115・半高0.055）の内側と縁に毛先が
+    // 入り込むと「歯のような斑点」に見える。毛は下向きに垂れるため、
+    // 開口の上側は特に広めに無毛にする（垂れた毛先が開口を横切らない距離）。
+    if (p.y > 1.615 && p.y < 1.85 && Math.abs(p.x) < 0.21 && p.z > 0.2) continue;
+
+    // 顔の正面上部は短毛にして、目・鼻・口が読めるようにする（無毛地帯は作らない）。
+    // 二値ではなく滑らかなグラデーションで移行し、胴との「継ぎ目」を作らない。
+    const faceT =
+      THREE.MathUtils.smoothstep(p.y, 1.3, 1.75) *
+      THREE.MathUtils.smoothstep(p.z, -0.05, 0.25) *
+      (0.8 + Math.random() * 0.4);
+    const nearFace = faceT > 0.5;
+    let lengthScale = 1.0 - 0.38 * Math.min(1, faceT);
+    // 目のすぐ近く（前面側のみ）はやや短毛にして、白目が毛に半分埋まって
+    // 見えるようにする。頭頂の後ろ側まで短くすると地肌が露出するので絞る。
+    if ((dEyeL < 0.3 || dEyeR < 0.3) && p.z > 0.12) lengthScale *= 0.6;
+    // 口の周囲リングもやや短毛にして、毛が開口に垂れて口を隠さないようにする
+    // （短くしすぎると刈り込み跡に見えるので控えめに）。
+    if (Math.abs(p.y - 1.735) < 0.2 && p.z > 0.1) lengthScale *= 0.8;
+    // 口の直近リングはさらに短くして、毛が開口へ被らないようにする。
+    if (Math.abs(p.y - 1.735) < 0.15 && p.z > 0.2) lengthScale *= 0.55;
+    // 頭頂は毛をやや長めにして地肌の露出を埋める（長すぎると寝た毛軸の
+    // 根元色が真上に大きく露出して濃紺の斑になるため控えめに）。
+    if (n.y > 0.4) lengthScale *= 1.2;
+
+    // 15% は長めの「差し毛」にして、輪郭を大ぶりに波打たせる。
+    const guardHair = !nearFace && Math.random() < 0.12;
+    // 細めの毛を密に重ねて柔らかい質感にする（太い毛は硬く見える）。
+    const len = (0.11 + Math.random() * 0.13) * lengthScale * (guardHair ? 1.6 : 1.0);
+    let thickness = (0.023 + Math.random() * 0.014) * (guardHair ? 1.25 : 1.0);
+    if (nearFace) thickness *= 0.8; // 顔まわりはさらに細く柔らかく
+
+    // 毛流れ: 法線方向を基本に下へ垂らし、位置に応じたうねりで数本単位の
+    // 「房」のまとまりを作る（完全ランダムだと針山に見えるため）。
+    // 頭頂ほど強く寝かせて、上向きのトゲにならないようにする。
+    // 低めの周波数で大きめの房を作る（高周波だとウニ状に散らばる）。
+    const clump = Math.sin(p.x * 4.5 + p.y * 3.5) * 0.5 + Math.sin(p.z * 5.2 - p.y * 2.8) * 0.5;
+    jitter
+      .set(
+        Math.sin(p.y * 6 + p.z * 4.2) * 0.7 + (Math.random() - 0.5) * 0.22,
+        clump * 0.35,
+        Math.cos(p.x * 5.5 + p.y * 4.6) * 0.7 + (Math.random() - 0.5) * 0.22,
+      )
+      .multiplyScalar(0.3);
+    // 上向き法線ほど追加で寝かせる。寝かせすぎると毛が倒れて根元の濃色が
+    // 真上から露出し、頭頂だけ濃い斑に見えるため控えめに。
+    const crownDroop = Math.max(0, n.y) * 0.25;
+    // 長い差し毛ほど重力で強く垂れる（ウニ状の逆立ちを避ける）。
+    const guardDroop = guardHair ? 0.5 : 0;
+    dir
+      .copy(n)
+      .addScaledVector(down, 1.35 + crownDroop + guardDroop + Math.random() * 0.4)
+      .add(jitter)
+      .normalize();
+    quat.setFromUnitVectors(up, dir);
+
+    dummy.position.copy(p).addScaledVector(n, -0.02);
+    dummy.quaternion.copy(quat);
+    dummy.scale.set(thickness, len, thickness * 0.75);
+    dummy.updateMatrix();
+
+    // 毛束ごとの明るさのゆらぎ（ムラは控えめにして斑点ノイズを避ける）。
+    // わずかに青へ寄せて、強い光でも水色の印象が飛ばないようにする。
+    // 短毛（顔まわり）は根元の暗色が支配的になるため明るめに補正する。
+    let v = 0.9 + Math.random() * 0.1;
+    // 短毛ほど根元の暗色が支配的になるため、顔の度合いに応じて滑らかに明るく。
+    v *= 1 + 0.35 * Math.min(1, faceT);
+    // 頭頂（上向き法線）は真上から根元が見えて暗く沈みやすいので少し持ち上げる。
+    v *= 1 + 0.32 * Math.max(0, n.y);
+    // 赤成分を下げて青の彩度を保つ（グレー寄りに washed out させない）。
+    // ただし顔の短毛は根元の濃青が支配的で「顔だけ濃いパッチ」に見えるため、
+    // 顔の度合いに応じて乗算色を白側へ寄せ、体側の毛先色と揃える。
+    const fw = Math.min(1, faceT);
+    const rec: TuftRec = {
+      matrix: dummy.matrix.clone(),
+      r: v * (0.92 + 0.14 * fw),
+      g: v * (0.97 + 0.09 * fw),
+      b: v * 1.05,
+      px: p.x,
+      py: p.y,
+      pz: p.z,
+      ny: n.y,
+      faceT: fw,
+    };
+    (n.y > CROWN_NY ? crownRecs : mainRecs).push(rec);
+    placed++;
+  }
+
+  // 胴体用（根元は濃青）と頭頂用（根元から明るい）の2メッシュに分けて生成。
+  const fur = new THREE.Group();
+  const parts: FurPart[] = [];
+  const defs: Array<{ recs: TuftRec[]; rootMix: number }> = [
+    { recs: mainRecs, rootMix: 0 },
+    { recs: crownRecs, rootMix: 0.55 },
+  ];
+  for (const { recs, rootMix } of defs) {
+    const mesh = new THREE.InstancedMesh(makeTuftGeometry(rootMix), mat, recs.length);
+    const tufts: TuftData = {
+      px: new Float32Array(recs.length),
+      py: new Float32Array(recs.length),
+      pz: new Float32Array(recs.length),
+      ny: new Float32Array(recs.length),
+      faceT: new Float32Array(recs.length),
+    };
+    recs.forEach((rec, i) => {
+      mesh.setMatrixAt(i, rec.matrix);
+      mesh.setColorAt(i, tint.setRGB(rec.r, rec.g, rec.b));
+      tufts.px[i] = rec.px;
+      tufts.py[i] = rec.py;
+      tufts.pz[i] = rec.pz;
+      tufts.ny[i] = rec.ny;
+      tufts.faceT[i] = rec.faceT;
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    fur.add(mesh);
+    parts.push({ mesh, tufts });
+  }
+
+  return { fur, parts };
+}
+
+// ---- 実写リファレンスによる毛束ティント -------------------------------------
+
+/** モデル座標の縦アンカー（展開テクスチャの行との対応付け）。 */
+const REF_Y_TOP = 2.27; // 頭頂 → row 0
+const REF_Y_NOSE = 1.94; // 鼻 → meta.noseRow
+const REF_Y_BOTTOM = -0.32; // 体の下端 → 最終行
+
+/**
+ * 公式ステッカー写真から生成した展開テクスチャ（行=高さ・列=シルエット
+ * 横断方向）を毛束ごとにサンプルし、インスタンス色として適用する。
+ * 実写の毛並みの色ムラ・陰影がそのままファーに乗る。
+ */
+function applyFurReferenceToInstances(
+  parts: FurPart[],
+  image: HTMLImageElement,
+  meta: FurRefMeta,
+): void {
+  const canvas = document.createElement("canvas");
+  canvas.width = meta.width;
+  canvas.height = meta.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.drawImage(image, 0, 0, meta.width, meta.height);
+  const data = ctx.getImageData(0, 0, meta.width, meta.height).data;
+
+  // 「見た目の体色 ≒ 毛先色」なので、写真画素 ÷ 毛先色 をティントにすると
+  // ファー外殻の色が写真の色に一致する。
+  const tipColor = new THREE.Color(FUR_TIP);
+  const tint = new THREE.Color();
+
+  // 縦: 頭頂→鼻 / 鼻→体下端 の2区間ピースワイズ線形。
+  // （実物は鼻が頭頂のすぐ下にあり、モデルと縦比率が異なるため。）
+  const rowOf = (y: number): number => {
+    if (y >= REF_Y_NOSE) {
+      const t = (REF_Y_TOP - y) / (REF_Y_TOP - REF_Y_NOSE);
+      return THREE.MathUtils.clamp(t, 0, 1) * meta.noseRow;
+    }
+    const t = (REF_Y_NOSE - y) / (REF_Y_NOSE - REF_Y_BOTTOM);
+    return meta.noseRow + THREE.MathUtils.clamp(t, 0, 1) * (meta.height - 1 - meta.noseRow);
+  };
+
+  for (const { mesh, tufts } of parts) {
+  for (let i = 0; i < mesh.count; i++) {
+    // 横: 体軸まわりの角度 θ の sin を列に対応付ける（正射影と同じ写像）。
+    // テクスチャは左右対称化済みなので、背面は前面のミラーになる。
+    const theta = Math.atan2(tufts.px[i], tufts.pz[i]);
+    const u = 0.5 + 0.5 * Math.sin(theta);
+    // サンプル位置に小さなジッタを加え、列に沿った「縦筋」の帯を散らす。
+    const col = THREE.MathUtils.clamp(
+      u * (meta.width - 1) + (Math.random() - 0.5) * 3,
+      0,
+      meta.width - 1,
+    );
+    const row = THREE.MathUtils.clamp(
+      rowOf(tufts.py[i]) + (Math.random() - 0.5) * 2.4,
+      0,
+      meta.height - 1,
+    );
+
+    // バイリニアサンプル
+    const c0 = Math.floor(col);
+    const r0 = Math.floor(row);
+    const c1 = Math.min(meta.width - 1, c0 + 1);
+    const r1 = Math.min(meta.height - 1, r0 + 1);
+    const fc = col - c0;
+    const fr = row - r0;
+    let rr = 0;
+    let gg = 0;
+    let bb = 0;
+    for (const [ci, ri, w] of [
+      [c0, r0, (1 - fc) * (1 - fr)],
+      [c1, r0, fc * (1 - fr)],
+      [c0, r1, (1 - fc) * fr],
+      [c1, r1, fc * fr],
+    ] as const) {
+      const o = (ri * meta.width + ci) * 4;
+      rr += data[o] * w;
+      gg += data[o + 1] * w;
+      bb += data[o + 2] * w;
+    }
+
+    // 暗すぎる画素（毛の間の深い影）はそのまま使うと黒い斑点になるため、
+    // 明度の床を設けて持ち上げる（色相は保つ）。
+    const lum = (rr + gg + bb) / 3;
+    const FLOOR = 96;
+    if (lum < FLOOR && lum > 0) {
+      const k = FLOOR / lum;
+      rr *= k;
+      gg *= k;
+      bb *= k;
+    }
+
+    // ティント = 写真色 ÷ 毛先色。既存の微調整（明度ゆらぎ・頭頂/顔の
+    // 持ち上げ）は控えめに残す（3D側の根元露出はテクスチャに無い情報のため）。
+    // 頭頂は droop で毛が寝て根元（濃青）が真上に露出するため、
+    // 手続き版と同等以上に強く持ち上げないと濃紺の斑が出る。
+    let v = 0.96 + Math.random() * 0.07;
+    v *= 1 + 0.2 * tufts.faceT[i];
+    v *= 1 + 0.45 * Math.max(0, tufts.ny[i]);
+    // 赤をわずかに抑えて「紫被り」を防ぎ、実物のパウダーブルー寄りにする。
+    tint.setRGB(
+      THREE.MathUtils.clamp((v * 0.95 * (rr / 255)) / tipColor.r, 0.25, 1.45),
+      THREE.MathUtils.clamp((v * (gg / 255)) / tipColor.g, 0.25, 1.45),
+      THREE.MathUtils.clamp((v * (bb / 255)) / tipColor.b, 0.25, 1.45),
+    );
+    mesh.setColorAt(i, tint);
+  }
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }
+}
+
+/**
+ * 頭のてっぺんに乗るピンポン玉状の目。
+ * 実物は白い球に「平らな黒い円」が印刷のように付き、その内側に
+ * 小さな白い点が1つ入る（球状の黒目ではない）。視線はやや内側・下寄り。
+ */
+function buildEye(side: 1 | -1): THREE.Group {
+  const group = new THREE.Group();
+
+  const whiteMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(EYE_WHITE),
+    roughness: 0.25,
+    metalness: 0.0,
+    // つやのある目が影に沈んで灰色に見えないよう、わずかに自発光。
+    emissive: new THREE.Color("#e9eef2"),
+    emissiveIntensity: 0.35,
+  });
+  const white = new THREE.Mesh(new THREE.SphereGeometry(0.2, 48, 48), whiteMat);
+  white.castShadow = true;
+  group.add(white);
+
+  // 黒目＝平らな黒い円盤（強くつぶした球）。やや内側・下寄りに貼る。
+  const irisMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(PUPIL),
+    roughness: 0.6,
+    metalness: 0.0,
+  });
+  const irisDir = new THREE.Vector3(-side * 0.3, -0.36, 1).normalize();
+  const iris = new THREE.Mesh(new THREE.SphereGeometry(0.082, 40, 40), irisMat);
+  iris.scale.set(1, 1, 0.16);
+  iris.position.copy(irisDir).multiplyScalar(0.185);
+  iris.lookAt(irisDir.clone().multiplyScalar(2));
+  group.add(iris);
+
+  // 黒円の内側に入る小さな白い点（フラット）。
+  const dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  // 大きいとドーナツ状に見えるため黒目径の3割弱に留め、内下へ寄せる。
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.023, 20, 20), dotMat);
+  dot.scale.set(1, 1, 0.2);
+  const dotDir = new THREE.Vector3(-side * 0.36, -0.42, 1).normalize();
+  dot.position.copy(dotDir).multiplyScalar(0.2);
+  dot.lookAt(dotDir.clone().multiplyScalar(2));
+  group.add(dot);
+
+  return group;
+}
+
+/** 黒い布張りボタン状の丸鼻。目のすぐ下・目と目の間に接する。 */
+function buildNose(): THREE.Mesh {
+  // 布張りボタンは鏡面反射がほぼ無い。Standard は roughness 1 でも広い
+  // スペキュラが残って「光沢球」に見えるため、純拡散の Lambert を使う。
+  const mat = new THREE.MeshLambertMaterial({
+    color: new THREE.Color(PUPIL),
+  });
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.115, 32, 32), mat);
+  nose.scale.set(1.14, 1.0, 0.75);
+  return nose;
+}
+
+/**
+ * 横に広い浅い口。楕円のデカールを体表（この高さの半径 ≒0.44）に沿って
+ * 湾曲させたもので、長方形やくちばし状に見えないようにする。
+ * メッシュの原点は体の軸上（口の高さ）に置くこと。しゃべる時は scale.y で縦に開く。
+ */
+function buildMouth(): THREE.Mesh {
+  // ライティングで灰色に浮かないよう、非ライトの黒（穴として読める）。
+  const mat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color("#131110"),
+    side: THREE.DoubleSide,
+  });
+  // 実物の口は小さく控えめ（幅は筒幅の約1/4以下）。
+  // 単位円 → 半幅0.16・半高0.085 の小さな楕円にし、x を弧長として筒面に巻き付ける。
+  // 地肌(≒0.458)より上・毛の垂れ(≒0.5)より中央は上。縁の沈み込みは
+  // 毛の垂れ境界までに留め、視点が回っても口が欠けないようにする。
+  const R_CENTER = 0.525;
+  const R_EDGE = 0.5;
+  const geo = new THREE.CircleGeometry(1, 48);
+  const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
+  for (let i = 0; i < posAttr.count; i++) {
+    const ux = posAttr.getX(i);
+    const uy = posAttr.getY(i);
+    const ex = ux * 0.115;
+    // 上縁が中央でわずかに凹む「軽く開いた曲線状の開口」にする。
+    let ey = uy * 0.055;
+    if (uy > 0) ey = uy * 0.03 - (1 - ux * ux) * 0.014;
+    const edge = Math.min(1, ux * ux + uy * uy); // 中心0→縁1
+    const r = R_CENTER - (R_CENTER - R_EDGE) * edge;
+    const theta = ex / r;
+    posAttr.setXYZ(i, r * Math.sin(theta), ey, r * Math.cos(theta));
+  }
+  geo.computeVertexNormals();
+  return new THREE.Mesh(geo, mat);
+}
+
+/** 指の分かれた大きな黒いフェルトの手。 */
+function buildHand(side: 1 | -1): THREE.Group {
+  const group = new THREE.Group();
+  const mat = skinMaterial(LIMB_DARK);
+
+  // 実物の手は「一枚の平たい黒フェルトの手袋」。手のひらは角の無い
+  // 丸みのある平板にし、指は根元同士が触れ合う間隔で深く食い込ませて
+  // 全体がひとつながりのシルエットに見えるようにする。
+  // 手首から幅が広がる平たいくさび（フェルトの手袋の土台）。
+  const wedge = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.26, 0.38, 24), mat);
+  wedge.scale.z = 0.2;
+  wedge.position.y = -0.19;
+  wedge.castShadow = true;
+  group.add(wedge);
+  // ナックル部分の幅広の平板。指の根元をここへ連続させる。
+  // 縦にも広げて、指の根元スリットの背景透けをこの板で塞ぐ。
+  const knuckle = new THREE.Mesh(new THREE.SphereGeometry(0.22, 32, 32), mat);
+  knuckle.scale.set(1.28, 0.8, 0.14);
+  knuckle.position.y = -0.42;
+  knuckle.castShadow = true;
+  group.add(knuckle);
+
+  // 長い 4 本指。1本ずつが別々の棒に見えると「傘の骨」になるため、
+  // 幅広・扁平な指を同一平面に置き、根元をナックル板に深く埋めて
+  // 手全体が「切れ込みの入った一枚のフェルト」として読めるようにする。
+  const fingerLens = [0.84, 0.96, 0.98, 0.82]; // 人差し指〜小指相当（掌より指が長い）
+  for (let i = 0; i < 4; i++) {
+    // 根元は互いに接し、先端だけ切れ込みで分かれる「一枚フェルトの手袋」。
+    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, fingerLens[i], 6, 12), mat);
+    // 切れ込みが根元まで見えると櫛状になるため、開きは先端側だけ僅かに。
+    const fan = (i - 1.5) * 0.06;
+    finger.position.set((i - 1.5) * 0.15, -0.52 - fingerLens[i] * 0.08, 0);
+    finger.rotation.z = -fan;
+    finger.scale.z = 0.28; // 断面を扁平に（丸棒でなく平リボンのフェルト感）
+    finger.castShadow = true;
+    group.add(finger);
+  }
+
+  // 親指は長めにして、手のひらからはっきり分岐させる。
+  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.58, 6, 12), mat);
+  // 横へ棒状に突き出さず、手のひらに沿って分岐して見える角度に。
+  thumb.position.set(side * 0.26, -0.36, 0);
+  thumb.rotation.z = side * 0.55;
+  thumb.scale.z = 0.42;
+  thumb.castShadow = true;
+  group.add(thumb);
+
+  return group;
+}
+
+/** 細く長い黒い腕＋指付きの手。肩を原点に下へ垂れる。 */
+function buildArm(side: 1 | -1, handOverride?: THREE.Object3D): THREE.Group {
+  const group = new THREE.Group();
+  const mat = skinMaterial(LIMB_DARK);
+
+  // 細長い腕（全身の約半分の長さ・筒幅の約 1/6 の太さ）。
+  const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 1.55, 20), mat);
+  upper.position.y = -0.775;
+  upper.castShadow = true;
+  group.add(upper);
+
+  // 手の原点は手首（腕の末端）。そこから手袋が下に伸びる。
+  // Blender製の一体成形フェルト手袋（メタボール）があればそれを使う。
+  const hand = handOverride ?? buildHand(side);
+  if (handOverride) {
+    handOverride.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) {
+        obj.material = mat;
+        obj.castShadow = true;
+      }
+    });
+  }
+  hand.position.y = -1.44;
+  // 手のひらはやや体側へ。正面からも開いた指が見える程度に留める。
+  // ひねりを付けると自動回転中のスクショで指同士が交差して見えるため正面向きに。
+  hand.rotation.y = 0;
+  hand.scale.setScalar(1.05);
+  group.add(hand);
+
+  return group;
+}
+
+/** 細い黒い脚＋大きく丸い黒い足。付け根を原点に下へ。 */
+function buildLeg(side: 1 | -1): THREE.Group {
+  const group = new THREE.Group();
+  const mat = skinMaterial(LIMB_DARK);
+
+  // 脚は棒ではなく、ぬいぐるみらしい太さ（筒幅の約 1/4〜1/3）。
+  const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.135, 0.15, 1.15, 24), mat);
+  leg.position.y = -0.56;
+  leg.castShadow = true;
+  group.add(leg);
+
+  // 大きく丸い靴のような足。前方主体に突き出し、軽い外股に。
+  // 薄い座布団でなく、丸くふくらんだプラッシュ靴のボリュームを出す。
+  const foot = new THREE.Mesh(new THREE.SphereGeometry(0.2, 32, 32), mat);
+  foot.scale.set(1.25, 1.3, 2.6);
+  // 内股に見えないよう左右間隔を空け、つま先はやや外向きに（開きすぎない）。
+  foot.position.set(side * 0.1, -1.02, 0.4);
+  foot.rotation.y = side * 0.3;
+  foot.castShadow = true;
+  group.add(foot);
+
+  return group;
+}
+
+/**
+ * Blender製 GLB ボディ（sunsun-body.glb）から、ファー植毛用の skin メッシュと
+ * 口シェイプキーの参照を取り出し、マテリアルを設定する。
+ * glTF はマテリアルごとにプリミティブ分割されるため、skin / mouth の
+ * 2 メッシュ構成になっている。
+ */
+function prepareGlbBody(glb: THREE.Object3D): {
+  group: THREE.Object3D;
+  skinMesh: THREE.Mesh;
+  setMouthOpen: (open: number) => void;
+} | null {
+  let skinMesh: THREE.Mesh | null = null;
+  const morphMeshes: THREE.Mesh[] = [];
+  glb.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    obj.castShadow = true;
+    obj.receiveShadow = true;
+    const matName = (obj.material as THREE.Material).name;
+    if (matName === "mouth") {
+      // 口腔の内側。ライティングで灰色に浮かないよう非ライトの黒。
+      obj.material = new THREE.MeshBasicMaterial({
+        color: new THREE.Color("#131110"),
+        side: THREE.DoubleSide,
+      });
+    } else {
+      // 地肌: 手続き版と同じ起毛（sheen）マテリアル。
+      obj.material = new THREE.MeshPhysicalMaterial({
+        color: new THREE.Color(SKIN_BASE),
+        roughness: 0.95,
+        metalness: 0,
+        sheen: 1.0,
+        sheenColor: new THREE.Color(SKY_LIGHT),
+        sheenRoughness: 0.55,
+      });
+      skinMesh = obj;
+    }
+    if (obj.morphTargetDictionary && "mouthOpen" in obj.morphTargetDictionary) {
+      morphMeshes.push(obj);
+    }
+  });
+  if (!skinMesh) return null;
+  const setMouthOpen = (open: number) => {
+    for (const m of morphMeshes) {
+      const idx = m.morphTargetDictionary!["mouthOpen"];
+      if (m.morphTargetInfluences) m.morphTargetInfluences[idx] = open;
+    }
+  };
+  return { group: glb, skinMesh, setMouthOpen };
+}
+
+/**
+ * スンスン一体を組み立てて返す。root をシーンに add すれば良い。
+ * head / eyes / arms はアニメーション用の参照。
+ *
+ * glbBody に Blender 製ボディ（sunsun-body.glb のシーン）を渡すと、
+ * ラテ+デカール口の手続き版の代わりに、本当に凹んだ口とシェイプキーの
+ * 口パクを持つメッシュを使う。省略時/失敗時は従来の手続き版。
+ */
+export function createSunsunModel(
+  glbBody?: THREE.Object3D,
+  glbHands?: THREE.Object3D,
+): SunsunModelParts {
+  const root = new THREE.Group();
+
+  const prepared = glbBody ? prepareGlbBody(glbBody) : null;
+
+  let body: THREE.Mesh;
+  let setMouthOpen: (open: number) => void;
+  if (prepared) {
+    root.add(prepared.group);
+    body = prepared.skinMesh;
+  } else {
+    body = buildBody();
+    root.add(body);
+  }
+
+  // 体のファー（もこもこ）。visible の切り替えでツルッと版と比較できる。
+  const { fur, parts } = buildFur(body);
+  root.add(fur);
+
+  // ---- 顔（まとめて軽く動かせるようグループ化） ----
+  const head = new THREE.Group();
+  root.add(head);
+
+  // 小さな白目 2 つを頭のてっぺんに、ほぼ接するように乗せる。
+  // 頭頂のドームに半分沈めて密着させ、互いにほぼ接するまで寄せる。
+  // 黒目が正面（カメラ側）を向くよう少し前へ傾ける。
+  // 大きめのピンポン玉の目をほぼ接するように。高さは少し非対称にして
+  // 実物の愛嬌を出す。
+  // 左右の見た目が揃うよう y 回転は付けない（黒円盤の見かけサイズが変わるため）。
+  const eyeL = buildEye(1);
+  eyeL.position.set(0.16, 2.14, 0.24);
+  eyeL.rotation.x = THREE.MathUtils.degToRad(20);
+
+  const eyeR = buildEye(-1);
+  eyeR.position.set(-0.16, 2.17, 0.24);
+  eyeR.rotation.x = THREE.MathUtils.degToRad(20);
+
+  head.add(eyeL, eyeR);
+
+  // 鼻は目のすぐ下・中央。ファーに埋もれないよう毛先より前へ出す。
+  // 鼻は両目の接合部の直下に接するように。
+  const nose = buildNose();
+  nose.position.set(0, 1.94, 0.46);
+  head.add(nose);
+
+  // 口。GLBボディでは凹んだ開口＋シェイプキーが既にあるため何も足さない。
+  // フォールバックの手続き版のみ、体表に沿う楕円デカールを鼻のすぐ下に貼る
+  // （上げすぎると鼻ボタンが口の中央を正面から隠し「二重の口」に見える）。
+  if (prepared) {
+    setMouthOpen = prepared.setMouthOpen;
+  } else {
+    const mouth = buildMouth();
+    mouth.position.set(0, 1.755, 0);
+    head.add(mouth);
+    const baseY = mouth.scale.y;
+    setMouthOpen = (open) => {
+      mouth.scale.y = baseY * (0.85 + open * 1.1);
+    };
+  }
+
+  // ---- 長い腕（肩は筒の上から約 1/3 の側面。体側に沿ってまっすぐ垂らす） ----
+  // ファーの外側に腕のラインが見えるよう、肩をやや外に出す。
+  // 腕はファーから離して外側へ垂らし、「腕」として読めるようにする
+  // （体に沿わせすぎると3/4視点で黒い裂け目に見える）。
+  const handL = glbHands?.getObjectByName("HandL");
+  const handR = glbHands?.getObjectByName("HandR");
+
+  const armL = buildArm(1, handL);
+  armL.position.set(0.53, 1.38, 0.1);
+  armL.rotation.z = THREE.MathUtils.degToRad(13);
+  armL.rotation.x = THREE.MathUtils.degToRad(-3);
+
+  const armR = buildArm(-1, handR);
+  armR.position.set(-0.53, 1.38, 0.1);
+  armR.rotation.z = THREE.MathUtils.degToRad(-13);
+  armR.rotation.x = THREE.MathUtils.degToRad(-3);
+
+  root.add(armL, armR);
+
+  // ---- 脚と大きな足（筒の下端から出る。足同士が触れない間隔） ----
+  const legL = buildLeg(1);
+  legL.position.set(0.21, -0.24, 0);
+
+  const legR = buildLeg(-1);
+  legR.position.set(-0.21, -0.24, 0);
+
+  root.add(legL, legR);
+
+  return {
+    root,
+    head,
+    eyes: [eyeL, eyeR],
+    setMouthOpen,
+    arms: [armL, armR],
+    fur,
+    applyFurReference: (image, meta) => applyFurReferenceToInstances(parts, image, meta),
+  };
+}
+
+export const SUNSUN_COLORS = { SKY, SKY_LIGHT, EYE_WHITE, PUPIL, LIMB_DARK };
