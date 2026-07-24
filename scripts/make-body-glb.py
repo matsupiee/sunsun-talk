@@ -38,7 +38,7 @@ PROFILE = [
     (0.02, 2.27),
 ]
 
-RADIAL = 96  # 周方向分割
+RADIAL = 160  # 周方向分割（口の輪郭のジャギー防止に高め）
 prof_r = np.array([p[0] for p in PROFILE])
 prof_y = np.array([p[1] for p in PROFILE])
 
@@ -50,7 +50,7 @@ for y0, y1 in zip(prof_y[:-1], prof_y[1:]):
 dense_y.append(prof_y[-1])
 dense_y = np.array(dense_y)
 # 口の高さ帯 (1.55..1.95) はさらに2倍の密度に
-extra = np.linspace(1.55, 1.95, 30)
+extra = np.linspace(1.55, 1.95, 64)
 dense_y = np.sort(np.unique(np.concatenate([dense_y, extra])))
 dense_r = np.interp(dense_y, prof_y, prof_r)
 
@@ -96,9 +96,9 @@ scene.collection.objects.link(body)
 # model座標: 口の中心 y=1.755, 前面。楕円 (半幅 0.115, 半高 0.055) の範囲を
 # 内側へ押し込む。デカール版と同じ見かけサイズ。
 MOUTH_Y = 1.755
-MOUTH_HALF_W = 0.115
-MOUTH_HALF_H = 0.055
-MOUTH_DEPTH = 0.10
+MOUTH_HALF_W = 0.15
+MOUTH_HALF_H = 0.068
+MOUTH_DEPTH = 0.11
 
 co = np.array([v.co[:] for v in mesh.vertices])  # Blender (x, y, z=height)
 mx, my, mz = co[:, 0], co[:, 1], co[:, 2]
@@ -151,7 +151,7 @@ for poly in mesh.polygons:
 body.shape_key_add(name="Basis", from_mix=False)
 key_open = body.shape_key_add(name="mouthOpen", from_mix=False)
 # 開口: 口楕円の下半分を下＋奥へ、上半分をわずかに上へ。周囲もわずかに追従。
-OPEN_DROP = 0.085
+OPEN_DROP = 0.11
 wide = front & (d2 < 3.2)
 for idx in np.where(wide)[0]:
     x0, y0, z0 = co[idx]

@@ -38,8 +38,8 @@ bsdf.inputs["Roughness"].default_value = 0.95
 def build_hand(side: int) -> bpy.types.Object:
     """side=+1 で左手（three.jsの buildHand(1) 相当）。"""
     mb = bpy.data.metaballs.new(f"HandMB{side}")
-    mb.resolution = 0.028
-    mb.render_resolution = 0.028
+    mb.resolution = 0.022
+    mb.render_resolution = 0.022
     obj = bpy.data.objects.new(f"HandMB{side}", mb)
     scene.collection.objects.link(obj)
 
@@ -50,19 +50,19 @@ def build_hand(side: int) -> bpy.types.Object:
     e.size_x, e.size_y, e.size_z = 0.12, 0.09, 0.18
     e = mb.elements.new(type="ELLIPSOID")
     e.co = (0, 0, -0.40)
-    e.size_x, e.size_y, e.size_z = 0.21, 0.09, 0.16
+    e.size_x, e.size_y, e.size_z = 0.24, 0.1, 0.17
 
     # 4本指: 根元側の約半分が互いに融合し、先端側だけ切れ込みで分かれる。
-    finger_lens = [0.84, 0.96, 0.98, 0.82]
+    finger_lens = [0.62, 0.70, 0.72, 0.60]
     for i, ln in enumerate(finger_lens):
-        x = (i - 1.5) * 0.115
-        fan = (i - 1.5) * 0.058  # 先端の開き（ラジアン）
+        x = (i - 1.5) * 0.135
+        fan = (i - 1.5) * 0.1  # 先端の開き（ラジアン）
         half = ln / 2
-        cz = -0.50 - half + 0.16  # 根元を掌に深く埋める
+        cz = -0.50 - half + 0.18  # 根元を掌に深く埋める
         cx = x + math.sin(fan) * half
         cap = mb.elements.new(type="CAPSULE")
         cap.co = (cx, 0, cz)
-        cap.radius = 0.082
+        cap.radius = 0.095
         cap.size_x = half
         # CAPSULE の軸は +X。Y軸まわり回転 θ で +X → (cosθ, 0, -sinθ)。
         # 指はほぼ +Z（対称形状なので符号は不問）、fan だけ傾ける。
@@ -75,9 +75,9 @@ def build_hand(side: int) -> bpy.types.Object:
     tang = math.pi / 2 - side * 0.7 if side > 0 else math.pi / 2 + 0.7
     tdir = (math.cos(tang), 0, -math.sin(tang))
     troot = (side * 0.17, 0, -0.46)
-    tlen = 0.15
+    tlen = 0.13
     th.co = (troot[0] + tdir[0] * tlen, 0, troot[2] + tdir[2] * tlen)
-    th.radius = 0.075
+    th.radius = 0.085
     th.size_x = tlen
     th.rotation = (math.cos(tang / 2), 0, math.sin(tang / 2), 0)
 

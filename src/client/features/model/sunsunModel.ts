@@ -41,8 +41,8 @@ export interface SunsunModelParts {
   setMouthOpen: (open: number) => void;
   /** 腕(左右)。軽く揺らす */
   arms: THREE.Group[];
-  /** 体のファー（毛束の InstancedMesh）。visible でもこもこON/OFF */
-  fur: THREE.InstancedMesh;
+  /** 体のファー（毛束の InstancedMesh 群）。visible でもこもこON/OFF */
+  fur: THREE.Object3D;
   /**
    * 実写リファレンス（公式ステッカー写真から生成した展開テクスチャ）を
    * 毛束ごとのティントに適用する。画像のロード完了後に呼ぶ。
@@ -60,11 +60,10 @@ export interface FurRefMeta {
 }
 
 function skinMaterial(color: string) {
-  // つるっとしたビニール人形のような、少しだけ光沢のあるマット。
-  return new THREE.MeshStandardMaterial({
+  // 腕・脚・手はフリース/フェルトの完全マット。Standard は roughness 1 でも
+  // 広いスペキュラが残ってプラスチックに見えるため、純拡散の Lambert。
+  return new THREE.MeshLambertMaterial({
     color: new THREE.Color(color),
-    roughness: 0.62,
-    metalness: 0.02,
   });
 }
 
@@ -135,37 +134,63 @@ interface TuftData {
   faceT: Float32Array;
 }
 
-function buildFur(body: THREE.Mesh): { fur: THREE.InstancedMesh; tufts: TuftData } {
-  const COUNT = 60000;
+/** ファーの構成メッシュ（胴体用・頭頂用）とその毛束データ。 */
+interface FurPart {
+  mesh: THREE.InstancedMesh;
+  tufts: TuftData;
+}
 
-  // 毛束テンプレート。根元を原点、+Y へ長さ 1 の細い錐。
+/**
+ * 毛束テンプレート（根元を原点、+Y へ長さ1の細い錐）に
+ * 根元→毛先の頂点カラーグラデーションを焼き込む。
+ * rootMix > 0 で根元色を毛先色側へ寄せる（頭頂用: 寝た毛の軸が
+ * 真上から見えても濃紺の斑にならないよう、根元から明るい色にする）。
+ */
+function makeTuftGeometry(rootMix: number): THREE.BufferGeometry {
   const geo = new THREE.ConeGeometry(1, 1, 4, 1, true);
   geo.translate(0, 0.5, 0);
   const pos = geo.getAttribute("position");
   const colors = new Float32Array(pos.count * 3);
-  const rootColor = new THREE.Color(FUR_ROOT);
   const tipColor = new THREE.Color(FUR_TIP);
+  const rootColor = new THREE.Color(FUR_ROOT).lerp(tipColor, rootMix);
   const c = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
     const t = THREE.MathUtils.clamp(pos.getY(i), 0, 1);
-    // 白化は毛先の2〜3割に限定し、中腹までは鮮やかな青を保つ
+    // 白化は毛先寄りに限定し、中腹までは青を保つ
     // （指数が低いと全体が白く飛んでラベンダー/グレー寄りに見える）。
-    // 頭頂の根元露出はインスタンス色の明度補正側で相殺する。
-    // 指数を上げすぎると根元の濃青が毛軸の大半を占め、毛が寝る頭頂で
-    // 「濃紺の斑」として露出する。中腹からゆるやかに毛先色へ移行させる。
     c.copy(rootColor).lerp(tipColor, Math.pow(t, 1.75));
     colors[i * 3] = c.r;
     colors[i * 3 + 1] = c.g;
     colors[i * 3 + 2] = c.b;
   }
   geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  return geo;
+}
+
+function buildFur(body: THREE.Mesh): { fur: THREE.Group; parts: FurPart[] } {
+  const COUNT = 60000;
+  // 頭頂（上向き法線）の毛束はこの閾値で専用メッシュへ振り分ける。
+  const CROWN_NY = 0.55;
 
   const mat = new THREE.MeshStandardMaterial({
     vertexColors: true,
     roughness: 0.9,
     metalness: 0,
   });
-  const fur = new THREE.InstancedMesh(geo, mat, COUNT);
+
+  interface TuftRec {
+    matrix: THREE.Matrix4;
+    r: number;
+    g: number;
+    b: number;
+    px: number;
+    py: number;
+    pz: number;
+    ny: number;
+    faceT: number;
+  }
+  const mainRecs: TuftRec[] = [];
+  const crownRecs: TuftRec[] = [];
 
   const sampler = new MeshSurfaceSampler(body).build();
   const p = new THREE.Vector3();
@@ -177,14 +202,6 @@ function buildFur(body: THREE.Mesh): { fur: THREE.InstancedMesh; tufts: TuftData
   const quat = new THREE.Quaternion();
   const dummy = new THREE.Object3D();
   const tint = new THREE.Color();
-
-  const tufts: TuftData = {
-    px: new Float32Array(COUNT),
-    py: new Float32Array(COUNT),
-    pz: new Float32Array(COUNT),
-    ny: new Float32Array(COUNT),
-    faceT: new Float32Array(COUNT),
-  };
 
   let placed = 0;
   let guard = 0;
@@ -203,7 +220,7 @@ function buildFur(body: THREE.Mesh): { fur: THREE.InstancedMesh; tufts: TuftData
     // 口（GLBボディの凹み楕円: 半幅0.115・半高0.055）の内側と縁に毛先が
     // 入り込むと「歯のような斑点」に見える。毛は下向きに垂れるため、
     // 開口の上側は特に広めに無毛にする（垂れた毛先が開口を横切らない距離）。
-    if (p.y > 1.665 && p.y < 1.845 && Math.abs(p.x) < 0.14 && p.z > 0.2) continue;
+    if (p.y > 1.645 && p.y < 1.865 && Math.abs(p.x) < 0.185 && p.z > 0.2) continue;
 
     // 顔の正面上部は短毛にして、目・鼻・口が読めるようにする（無毛地帯は作らない）。
     // 二値ではなく滑らかなグラデーションで移行し、胴との「継ぎ目」を作らない。
@@ -260,7 +277,6 @@ function buildFur(body: THREE.Mesh): { fur: THREE.InstancedMesh; tufts: TuftData
     dummy.quaternion.copy(quat);
     dummy.scale.set(thickness, len, thickness * 0.75);
     dummy.updateMatrix();
-    fur.setMatrixAt(placed, dummy.matrix);
 
     // 毛束ごとの明るさのゆらぎ（ムラは控えめにして斑点ノイズを避ける）。
     // わずかに青へ寄せて、強い光でも水色の印象が飛ばないようにする。
@@ -274,22 +290,53 @@ function buildFur(body: THREE.Mesh): { fur: THREE.InstancedMesh; tufts: TuftData
     // ただし顔の短毛は根元の濃青が支配的で「顔だけ濃いパッチ」に見えるため、
     // 顔の度合いに応じて乗算色を白側へ寄せ、体側の毛先色と揃える。
     const fw = Math.min(1, faceT);
-    fur.setColorAt(
-      placed,
-      tint.setRGB(v * (0.92 + 0.14 * fw), v * (0.97 + 0.09 * fw), v * 1.05),
-    );
-    tufts.px[placed] = p.x;
-    tufts.py[placed] = p.y;
-    tufts.pz[placed] = p.z;
-    tufts.ny[placed] = n.y;
-    tufts.faceT[placed] = Math.min(1, faceT);
+    const rec: TuftRec = {
+      matrix: dummy.matrix.clone(),
+      r: v * (0.92 + 0.14 * fw),
+      g: v * (0.97 + 0.09 * fw),
+      b: v * 1.05,
+      px: p.x,
+      py: p.y,
+      pz: p.z,
+      ny: n.y,
+      faceT: fw,
+    };
+    (n.y > CROWN_NY ? crownRecs : mainRecs).push(rec);
     placed++;
   }
-  fur.count = placed;
-  fur.instanceMatrix.needsUpdate = true;
-  if (fur.instanceColor) fur.instanceColor.needsUpdate = true;
 
-  return { fur, tufts };
+  // 胴体用（根元は濃青）と頭頂用（根元から明るい）の2メッシュに分けて生成。
+  const fur = new THREE.Group();
+  const parts: FurPart[] = [];
+  const defs: Array<{ recs: TuftRec[]; rootMix: number }> = [
+    { recs: mainRecs, rootMix: 0 },
+    { recs: crownRecs, rootMix: 0.55 },
+  ];
+  for (const { recs, rootMix } of defs) {
+    const mesh = new THREE.InstancedMesh(makeTuftGeometry(rootMix), mat, recs.length);
+    const tufts: TuftData = {
+      px: new Float32Array(recs.length),
+      py: new Float32Array(recs.length),
+      pz: new Float32Array(recs.length),
+      ny: new Float32Array(recs.length),
+      faceT: new Float32Array(recs.length),
+    };
+    recs.forEach((rec, i) => {
+      mesh.setMatrixAt(i, rec.matrix);
+      mesh.setColorAt(i, tint.setRGB(rec.r, rec.g, rec.b));
+      tufts.px[i] = rec.px;
+      tufts.py[i] = rec.py;
+      tufts.pz[i] = rec.pz;
+      tufts.ny[i] = rec.ny;
+      tufts.faceT[i] = rec.faceT;
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    fur.add(mesh);
+    parts.push({ mesh, tufts });
+  }
+
+  return { fur, parts };
 }
 
 // ---- 実写リファレンスによる毛束ティント -------------------------------------
@@ -305,8 +352,7 @@ const REF_Y_BOTTOM = -0.32; // 体の下端 → 最終行
  * 実写の毛並みの色ムラ・陰影がそのままファーに乗る。
  */
 function applyFurReferenceToInstances(
-  fur: THREE.InstancedMesh,
-  tufts: TuftData,
+  parts: FurPart[],
   image: HTMLImageElement,
   meta: FurRefMeta,
 ): void {
@@ -322,7 +368,6 @@ function applyFurReferenceToInstances(
   // ファー外殻の色が写真の色に一致する。
   const tipColor = new THREE.Color(FUR_TIP);
   const tint = new THREE.Color();
-  const count = fur.count;
 
   // 縦: 頭頂→鼻 / 鼻→体下端 の2区間ピースワイズ線形。
   // （実物は鼻が頭頂のすぐ下にあり、モデルと縦比率が異なるため。）
@@ -335,7 +380,8 @@ function applyFurReferenceToInstances(
     return meta.noseRow + THREE.MathUtils.clamp(t, 0, 1) * (meta.height - 1 - meta.noseRow);
   };
 
-  for (let i = 0; i < count; i++) {
+  for (const { mesh, tufts } of parts) {
+  for (let i = 0; i < mesh.count; i++) {
     // 横: 体軸まわりの角度 θ の sin を列に対応付ける（正射影と同じ写像）。
     // テクスチャは左右対称化済みなので、背面は前面のミラーになる。
     const theta = Math.atan2(tufts.px[i], tufts.pz[i]);
@@ -389,17 +435,19 @@ function applyFurReferenceToInstances(
     // 持ち上げ）は控えめに残す（3D側の根元露出はテクスチャに無い情報のため）。
     // 頭頂は droop で毛が寝て根元（濃青）が真上に露出するため、
     // 手続き版と同等以上に強く持ち上げないと濃紺の斑が出る。
-    let v = 0.95 + Math.random() * 0.1;
+    let v = 0.96 + Math.random() * 0.07;
     v *= 1 + 0.2 * tufts.faceT[i];
     v *= 1 + 0.45 * Math.max(0, tufts.ny[i]);
+    // 赤をわずかに抑えて「紫被り」を防ぎ、実物のパウダーブルー寄りにする。
     tint.setRGB(
-      THREE.MathUtils.clamp((v * (rr / 255)) / tipColor.r, 0.25, 1.45),
+      THREE.MathUtils.clamp((v * 0.95 * (rr / 255)) / tipColor.r, 0.25, 1.45),
       THREE.MathUtils.clamp((v * (gg / 255)) / tipColor.g, 0.25, 1.45),
       THREE.MathUtils.clamp((v * (bb / 255)) / tipColor.b, 0.25, 1.45),
     );
-    fur.setColorAt(i, tint);
+    mesh.setColorAt(i, tint);
   }
-  if (fur.instanceColor) fur.instanceColor.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }
 }
 
 /**
@@ -499,7 +547,6 @@ function buildMouth(): THREE.Mesh {
 function buildHand(side: 1 | -1): THREE.Group {
   const group = new THREE.Group();
   const mat = skinMaterial(LIMB_DARK);
-  mat.roughness = 0.95;
 
   // 実物の手は「一枚の平たい黒フェルトの手袋」。手のひらは角の無い
   // 丸みのある平板にし、指は根元同士が触れ合う間隔で深く食い込ませて
@@ -550,7 +597,6 @@ function buildHand(side: 1 | -1): THREE.Group {
 function buildArm(side: 1 | -1, handOverride?: THREE.Object3D): THREE.Group {
   const group = new THREE.Group();
   const mat = skinMaterial(LIMB_DARK);
-  mat.roughness = 0.95;
 
   // 細長い腕（全身の約半分の長さ・筒幅の約 1/6 の太さ）。
   const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 1.55, 20), mat);
@@ -583,7 +629,6 @@ function buildArm(side: 1 | -1, handOverride?: THREE.Object3D): THREE.Group {
 function buildLeg(side: 1 | -1): THREE.Group {
   const group = new THREE.Group();
   const mat = skinMaterial(LIMB_DARK);
-  mat.roughness = 0.95;
 
   // 脚は棒ではなく、ぬいぐるみらしい太さ（筒幅の約 1/4〜1/3）。
   const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.135, 0.15, 1.15, 24), mat);
@@ -681,7 +726,7 @@ export function createSunsunModel(
   }
 
   // 体のファー（もこもこ）。visible の切り替えでツルッと版と比較できる。
-  const { fur, tufts } = buildFur(body);
+  const { fur, parts } = buildFur(body);
   root.add(fur);
 
   // ---- 顔（まとめて軽く動かせるようグループ化） ----
@@ -760,7 +805,7 @@ export function createSunsunModel(
     setMouthOpen,
     arms: [armL, armR],
     fur,
-    applyFurReference: (image, meta) => applyFurReferenceToInstances(fur, tufts, image, meta),
+    applyFurReference: (image, meta) => applyFurReferenceToInstances(parts, image, meta),
   };
 }
 
