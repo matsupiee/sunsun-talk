@@ -170,7 +170,7 @@ function makeTuftGeometry(rootMix: number): THREE.BufferGeometry {
 function buildFur(body: THREE.Mesh): { fur: THREE.Group; parts: FurPart[] } {
   const COUNT = 60000;
   // 頭頂（上向き法線）の毛束はこの閾値で専用メッシュへ振り分ける。
-  const CROWN_NY = 0.55;
+  const CROWN_NY = 0.35;
 
   const mat = new THREE.MeshStandardMaterial({
     vertexColors: true,
@@ -215,12 +215,12 @@ function buildFur(body: THREE.Mesh): { fur: THREE.Group; parts: FurPart[] } {
     // 目の球・鼻・口の輪郭ぎわ数ミリだけは毛を植えない（それ以外は頭頂まで生やす）。
     const dEyeL = p.distanceTo(EYE_L_POS);
     const dEyeR = p.distanceTo(EYE_R_POS);
-    if (dEyeL < 0.145 || dEyeR < 0.145) continue;
-    if (p.distanceTo(NOSE_POS) < 0.11) continue;
+    if (dEyeL < 0.125 || dEyeR < 0.125) continue;
+    if (p.distanceTo(NOSE_POS) < 0.09) continue;
     // 口（GLBボディの凹み楕円: 半幅0.115・半高0.055）の内側と縁に毛先が
     // 入り込むと「歯のような斑点」に見える。毛は下向きに垂れるため、
     // 開口の上側は特に広めに無毛にする（垂れた毛先が開口を横切らない距離）。
-    if (p.y > 1.645 && p.y < 1.865 && Math.abs(p.x) < 0.185 && p.z > 0.2) continue;
+    if (p.y > 1.615 && p.y < 1.85 && Math.abs(p.x) < 0.21 && p.z > 0.2) continue;
 
     // 顔の正面上部は短毛にして、目・鼻・口が読めるようにする（無毛地帯は作らない）。
     // 二値ではなく滑らかなグラデーションで移行し、胴との「継ぎ目」を作らない。
@@ -235,9 +235,9 @@ function buildFur(body: THREE.Mesh): { fur: THREE.Group; parts: FurPart[] } {
     if ((dEyeL < 0.3 || dEyeR < 0.3) && p.z > 0.12) lengthScale *= 0.6;
     // 口の周囲リングもやや短毛にして、毛が開口に垂れて口を隠さないようにする
     // （短くしすぎると刈り込み跡に見えるので控えめに）。
-    if (Math.abs(p.y - 1.755) < 0.2 && p.z > 0.1) lengthScale *= 0.8;
+    if (Math.abs(p.y - 1.735) < 0.2 && p.z > 0.1) lengthScale *= 0.8;
     // 口の直近リングはさらに短くして、毛が開口へ被らないようにする。
-    if (Math.abs(p.y - 1.755) < 0.14 && p.z > 0.2) lengthScale *= 0.55;
+    if (Math.abs(p.y - 1.735) < 0.15 && p.z > 0.2) lengthScale *= 0.55;
     // 頭頂は毛をやや長めにして地肌の露出を埋める（長すぎると寝た毛軸の
     // 根元色が真上に大きく露出して濃紺の斑になるため控えめに）。
     if (n.y > 0.4) lengthScale *= 1.2;
@@ -504,7 +504,7 @@ function buildNose(): THREE.Mesh {
     color: new THREE.Color(PUPIL),
   });
   const nose = new THREE.Mesh(new THREE.SphereGeometry(0.115, 32, 32), mat);
-  nose.scale.set(1.05, 1.0, 0.75);
+  nose.scale.set(1.14, 1.0, 0.75);
   return nose;
 }
 

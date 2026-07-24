@@ -95,9 +95,9 @@ scene.collection.objects.link(body)
 # ---- 口の凹み（本物の開口） --------------------------------------------------
 # model座標: 口の中心 y=1.755, 前面。楕円 (半幅 0.115, 半高 0.055) の範囲を
 # 内側へ押し込む。デカール版と同じ見かけサイズ。
-MOUTH_Y = 1.755
-MOUTH_HALF_W = 0.15
-MOUTH_HALF_H = 0.068
+MOUTH_Y = 1.735
+MOUTH_HALF_W = 0.17
+MOUTH_HALF_H = 0.062
 MOUTH_DEPTH = 0.11
 
 co = np.array([v.co[:] for v in mesh.vertices])  # Blender (x, y, z=height)
@@ -151,7 +151,8 @@ for poly in mesh.polygons:
 body.shape_key_add(name="Basis", from_mix=False)
 key_open = body.shape_key_add(name="mouthOpen", from_mix=False)
 # 開口: 口楕円の下半分を下＋奥へ、上半分をわずかに上へ。周囲もわずかに追従。
-OPEN_DROP = 0.11
+OPEN_DROP = 0.15
+WIDEN = 0.055  # 開口時に口角が横へ広がる量
 wide = front & (d2 < 3.2)
 for idx in np.where(wide)[0]:
     x0, y0, z0 = co[idx]
@@ -161,12 +162,13 @@ for idx in np.where(wide)[0]:
     dd = pdx * pdx + pdz * pdz
     w = max(0.0, 1.0 - dd / 3.2)
     kv = key_open.data[idx]
-    if pdz < 0:  # 下唇側
+    # 口角が横へ広がり、公式の「横に大きく開くアーチ状の口」に近づける
+    kv.co.x = x0 + (0.06 if x0 > 0 else -0.06) * WIDEN / 0.055 * (w ** 1.2) * min(1.0, abs(pdx))
+    if pdz < 0:  # 下唇側は大きく下へ＋奥へ
         kv.co.z = z0 - OPEN_DROP * (w ** 1.3)
-        kv.co.y = y0 + 0.05 * (w ** 1.5)  # 開くほど奥へ
-    else:  # 上唇側は控えめに上へ
-        kv.co.z = z0 + 0.02 * (w ** 1.5)
-        kv.co.y = y0 + 0.02 * (w ** 1.5)
+        kv.co.y = y0 + 0.06 * (w ** 1.5)
+    else:  # 上唇側は動かさない（上げると鼻と融合して見える）
+        kv.co.y = y0 + 0.015 * (w ** 1.5)
 
 # ---- エクスポート ------------------------------------------------------------
 bpy.ops.object.select_all(action="DESELECT")

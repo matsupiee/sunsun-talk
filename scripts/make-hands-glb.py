@@ -53,16 +53,16 @@ def build_hand(side: int) -> bpy.types.Object:
     e.size_x, e.size_y, e.size_z = 0.24, 0.1, 0.17
 
     # 4本指: 根元側の約半分が互いに融合し、先端側だけ切れ込みで分かれる。
-    finger_lens = [0.62, 0.70, 0.72, 0.60]
+    finger_lens = [0.52, 0.58, 0.60, 0.50]
     for i, ln in enumerate(finger_lens):
-        x = (i - 1.5) * 0.135
-        fan = (i - 1.5) * 0.1  # 先端の開き（ラジアン）
+        x = (i - 1.5) * 0.14
+        fan = (i - 1.5) * 0.09  # 先端の開き（ラジアン）
         half = ln / 2
         cz = -0.50 - half + 0.18  # 根元を掌に深く埋める
         cx = x + math.sin(fan) * half
         cap = mb.elements.new(type="CAPSULE")
         cap.co = (cx, 0, cz)
-        cap.radius = 0.095
+        cap.radius = 0.1
         cap.size_x = half
         # CAPSULE の軸は +X。Y軸まわり回転 θ で +X → (cosθ, 0, -sinθ)。
         # 指はほぼ +Z（対称形状なので符号は不問）、fan だけ傾ける。
@@ -89,7 +89,7 @@ def build_hand(side: int) -> bpy.types.Object:
     hand.name = "HandL" if side > 0 else "HandR"
 
     # フェルトらしく平たく（Y方向 = three.js の Z 厚み）
-    hand.scale = (1.0, 0.42, 1.0)
+    hand.scale = (1.0, 0.52, 1.0)
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
 
     # スムーズシェード + マテリアル
