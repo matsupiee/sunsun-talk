@@ -22,19 +22,20 @@ scene = bpy.context.scene
 
 # ---- ボディのラテ（回転体）メッシュ -----------------------------------------
 # three.js 版 LatheGeometry と同じプロファイル (radius, y)。
+# 実物は下端まですぼまらない「まっすぐでやや太めの筒」。裾も太さを保つ。
 PROFILE = [
     (0.02, -0.32),
-    (0.25, -0.30),
-    (0.39, -0.22),
-    (0.45, -0.02),
-    (0.46, 0.30),
-    (0.465, 0.70),
-    (0.47, 1.10),
-    (0.47, 1.50),
-    (0.45, 1.80),
-    (0.41, 2.00),
-    (0.33, 2.14),
-    (0.20, 2.23),
+    (0.34, -0.30),
+    (0.465, -0.22),
+    (0.49, -0.02),
+    (0.50, 0.30),
+    (0.50, 0.70),
+    (0.505, 1.10),
+    (0.505, 1.50),
+    (0.485, 1.80),
+    (0.44, 2.00),
+    (0.355, 2.14),
+    (0.215, 2.23),
     (0.02, 2.27),
 ]
 
@@ -49,8 +50,8 @@ for y0, y1 in zip(prof_y[:-1], prof_y[1:]):
     dense_y.extend(seg.tolist())
 dense_y.append(prof_y[-1])
 dense_y = np.array(dense_y)
-# 口の高さ帯 (1.55..1.95) はさらに2倍の密度に
-extra = np.linspace(1.55, 1.95, 64)
+# 口〜あご（開口時に伸びる帯域）はさらに高密度に
+extra = np.linspace(1.5, 2.05, 88)
 dense_y = np.sort(np.unique(np.concatenate([dense_y, extra])))
 dense_r = np.interp(dense_y, prof_y, prof_r)
 
@@ -95,17 +96,22 @@ scene.collection.objects.link(body)
 # ---- 口の凹み（本物の開口） --------------------------------------------------
 # model座標: 口の中心 y=1.755, 前面。楕円 (半幅 0.115, 半高 0.055) の範囲を
 # 内側へ押し込む。デカール版と同じ見かけサイズ。
-MOUTH_Y = 1.735
-MOUTH_HALF_W = 0.17
-MOUTH_HALF_H = 0.062
-MOUTH_DEPTH = 0.11
+# 実物の閉じた口は「横に広い、口角が下がった細い線」。開くと顔の下半分を
+# 占める大きなアーチになる（WA!ステッカー参照）。
+MOUTH_Y = 1.87
+MOUTH_HALF_W = 0.165
+MOUTH_HALF_H = 0.02
+MOUTH_DEPTH = 0.07
+MOUTH_CURVE = 0.018  # 口角が下がるカーブ量（強いと不機嫌顔・困り顔になる）
 
 co = np.array([v.co[:] for v in mesh.vertices])  # Blender (x, y, z=height)
 mx, my, mz = co[:, 0], co[:, 1], co[:, 2]
 front = my < -0.15  # model +z 側
-# 楕円距離（x は弧長近似としてそのまま使う）
+# 楕円距離（x は弧長近似としてそのまま使う）。
+# 口の中心線は中央が高く口角へ向けて下がるカーブ（への字ぎみ）。
 dx = mx / MOUTH_HALF_W
-dzv = (mz - MOUTH_Y) / MOUTH_HALF_H
+center_z = MOUTH_Y - MOUTH_CURVE * np.clip(np.abs(dx), 0, 1.5) ** 2
+dzv = (mz - center_z) / MOUTH_HALF_H
 d2 = dx * dx + dzv * dzv
 in_mouth = front & (d2 < 1.0)
 fall = np.zeros(len(co))
@@ -142,33 +148,43 @@ for poly in mesh.polygons:
     cz = sum(mesh.vertices[v].co.z for v in poly.vertices) / len(poly.vertices)
     if cy < -0.15:
         pdx = cx / MOUTH_HALF_W
-        pdz = (cz - MOUTH_Y) / MOUTH_HALF_H
-        if pdx * pdx + pdz * pdz < 0.98:
+        pcz = MOUTH_Y - MOUTH_CURVE * min(abs(pdx), 1.5) ** 2
+        pdz = (cz - pcz) / MOUTH_HALF_H
+        # 開口時に側壁の地肌が見えないよう、黒領域は輪郭より少し広めに取る
+        if pdx * pdx + pdz * pdz < 1.2:
             poly.material_index = 1
     poly.use_smooth = True
 
 # ---- シェイプキー: mouthOpen -------------------------------------------------
 body.shape_key_add(name="Basis", from_mix=False)
 key_open = body.shape_key_add(name="mouthOpen", from_mix=False)
-# 開口: 口楕円の下半分を下＋奥へ、上半分をわずかに上へ。周囲もわずかに追従。
-OPEN_DROP = 0.15
-WIDEN = 0.055  # 開口時に口角が横へ広がる量
-wide = front & (d2 < 3.2)
+# 開口: 口の中心線より下のあご領域を大きく下＋奥へ動かし、
+# 「顔の下半分を占める大きな開口」を作る（WA!ステッカー参照）。
+# 影響範囲は閉じ口の細い楕円ではなく、開口の目標サイズ
+# （OPEN_HALF_H）で正規化した大きな楕円で取る。
+# 本物は開くと「顔の下半分がまるごと割れる」巨大な口（幅は顔幅の8割級）。
+OPEN_DROP = 0.36
+OPEN_HALF_H = 0.2  # 開口の縦方向の影響半径
+WIDEN = 0.17  # 開口時に口角が横へ広がる量
+open_dx = mx / (MOUTH_HALF_W * 1.3)
+open_center = MOUTH_Y - MOUTH_CURVE * np.clip(np.abs(open_dx), 0, 1.5) ** 2
+open_dz = (mz - open_center) / OPEN_HALF_H
+open_d2 = open_dx * open_dx + open_dz * open_dz
+wide = front & (open_d2 < 3.0)
 for idx in np.where(wide)[0]:
     x0, y0, z0 = co[idx]
     y0 += closed_offset[idx]  # 閉口時の位置から
-    pdx = x0 / MOUTH_HALF_W
-    pdz = (z0 - MOUTH_Y) / MOUTH_HALF_H
-    dd = pdx * pdx + pdz * pdz
-    w = max(0.0, 1.0 - dd / 3.2)
+    pdx = open_dx[idx]
+    pdz = open_dz[idx]
+    w = max(0.0, 1.0 - (pdx * pdx + pdz * pdz) / 3.0)
     kv = key_open.data[idx]
     # 口角が横へ広がり、公式の「横に大きく開くアーチ状の口」に近づける
-    kv.co.x = x0 + (0.06 if x0 > 0 else -0.06) * WIDEN / 0.055 * (w ** 1.2) * min(1.0, abs(pdx))
-    if pdz < 0:  # 下唇側は大きく下へ＋奥へ
-        kv.co.z = z0 - OPEN_DROP * (w ** 1.3)
-        kv.co.y = y0 + 0.06 * (w ** 1.5)
+    kv.co.x = x0 + (WIDEN if x0 > 0 else -WIDEN) * (w ** 1.2) * min(1.0, abs(pdx) * 1.4)
+    if pdz < 0:  # 下唇〜あご側は大きく下へ＋奥へ
+        kv.co.z = z0 - OPEN_DROP * (w ** 1.2)
+        kv.co.y = y0 + 0.07 * (w ** 1.4)
     else:  # 上唇側は動かさない（上げると鼻と融合して見える）
-        kv.co.y = y0 + 0.015 * (w ** 1.5)
+        kv.co.y = y0 + 0.012 * (w ** 1.5)
 
 # ---- エクスポート ------------------------------------------------------------
 bpy.ops.object.select_all(action="DESELECT")

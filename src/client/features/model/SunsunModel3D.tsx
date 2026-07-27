@@ -106,7 +106,7 @@ export function SunsunModel3D({
     );
     ground.rotation.x = -Math.PI / 2;
     // 足の裏が接地する高さ。
-    ground.position.y = -1.52;
+    ground.position.y = -1.3;
     ground.receiveShadow = true;
     scene.add(ground);
 
@@ -130,6 +130,8 @@ export function SunsunModel3D({
       if (disposed) return;
       sunsun = createSunsunModel(glbBody, glbHands);
       scene.add(sunsun.root);
+      // デバッグ/検証用の参照（口パク検証スクリプトから使う）。
+      (window as unknown as { __sunsun?: SunsunModelParts }).__sunsun = sunsun;
 
       // 実写リファレンス（公式ステッカー写真由来）でファーの色ムラを実物に寄せる。
       try {
@@ -189,11 +191,11 @@ export function SunsunModel3D({
         sunsun.head.rotation.z = Math.sin(t * 0.8 + 0.5) * 0.03;
         sunsun.head.rotation.x = Math.sin(t * 1.1) * 0.02;
 
-        // グーグリーアイのぷるぷる。
+        // グーグリーアイのぷるぷる（視線が外れて見えない程度に控えめ）。
         sunsun.eyes.forEach((eye, i) => {
           const p = t * 2.3 + i * 1.7;
-          eye.rotation.x = Math.sin(p) * 0.06;
-          eye.rotation.z = Math.cos(p * 0.8) * 0.05 + (i === 0 ? 0.1 : -0.13);
+          eye.rotation.x = Math.sin(p) * 0.03;
+          eye.rotation.z = Math.cos(p * 0.8) * 0.025 + (i === 0 ? 0.04 : -0.05);
         });
 
         // 腕をゆらゆら。
@@ -208,6 +210,10 @@ export function SunsunModel3D({
         } else {
           mouthOpen += (0 - mouthOpen) * 0.15;
         }
+        // デバッグ/検証用: window.__sunsunMouthOverride = 0..1 で開口を固定できる。
+        const override = (window as unknown as { __sunsunMouthOverride?: number })
+          .__sunsunMouthOverride;
+        if (typeof override === "number") mouthOpen = override;
         sunsun.setMouthOpen(mouthOpen);
 
         // もこもこON/OFF。

@@ -50,19 +50,21 @@ def build_hand(side: int) -> bpy.types.Object:
     e.size_x, e.size_y, e.size_z = 0.12, 0.09, 0.18
     e = mb.elements.new(type="ELLIPSOID")
     e.co = (0, 0, -0.40)
-    e.size_x, e.size_y, e.size_z = 0.24, 0.1, 0.17
+    e.size_x, e.size_y, e.size_z = 0.21, 0.1, 0.17
 
     # 4本指: 根元側の約半分が互いに融合し、先端側だけ切れ込みで分かれる。
-    finger_lens = [0.52, 0.58, 0.60, 0.50]
+    # 実物の指はほぼ平行に垂れ下がる（扇状に開かない）。手は縦長で
+    # 指は掌より長く、細め。
+    finger_lens = [0.56, 0.63, 0.65, 0.54]
     for i, ln in enumerate(finger_lens):
-        x = (i - 1.5) * 0.14
-        fan = (i - 1.5) * 0.09  # 先端の開き（ラジアン）
+        x = (i - 1.5) * 0.115
+        fan = (i - 1.5) * 0.035  # 先端の開き（ラジアン）は控えめに
         half = ln / 2
         cz = -0.50 - half + 0.18  # 根元を掌に深く埋める
         cx = x + math.sin(fan) * half
         cap = mb.elements.new(type="CAPSULE")
         cap.co = (cx, 0, cz)
-        cap.radius = 0.1
+        cap.radius = 0.09
         cap.size_x = half
         # CAPSULE の軸は +X。Y軸まわり回転 θ で +X → (cosθ, 0, -sinθ)。
         # 指はほぼ +Z（対称形状なので符号は不問）、fan だけ傾ける。
