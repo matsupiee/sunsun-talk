@@ -43,43 +43,47 @@ def build_hand(side: int) -> bpy.types.Object:
     obj = bpy.data.objects.new(f"HandMB{side}", mb)
     scene.collection.objects.link(obj)
 
-    # 掌（手首から広がるくさび）: 縦に重ねた楕円2つ。
-    # 指の根元と強く重ねて、股が自然に繋がった手袋シルエットにする。
+    # 実物の手（公式写真）:
+    # - 掌は幅広で丸く、フェルトのミトンに近い
+    # - 指は4本とも「短く太い丸いこぶ」状で、軽く扇状に開く
+    #   （指の長さは手全体の4割弱。細長い指はNG）
+    # - 親指は太く、掌から大きく開いて突き出す
+    # 掌（手首→掌本体→指の付け根）: 縦に重ねた楕円で丸い土台を作る。
     e = mb.elements.new(type="ELLIPSOID")
-    e.co = (0, 0, -0.14)
-    e.size_x, e.size_y, e.size_z = 0.12, 0.09, 0.18
+    e.co = (0, 0, -0.12)
+    e.size_x, e.size_y, e.size_z = 0.11, 0.08, 0.16
     e = mb.elements.new(type="ELLIPSOID")
-    e.co = (0, 0, -0.40)
-    e.size_x, e.size_y, e.size_z = 0.21, 0.1, 0.17
+    e.co = (0, 0, -0.36)
+    e.size_x, e.size_y, e.size_z = 0.19, 0.1, 0.16
+    e = mb.elements.new(type="ELLIPSOID")
+    e.co = (0, 0, -0.5)
+    e.size_x, e.size_y, e.size_z = 0.21, 0.09, 0.1
 
-    # 4本指: 根元側の約半分が互いに融合し、先端側だけ切れ込みで分かれる。
-    # 実物の指はほぼ平行に垂れ下がる（扇状に開かない）。手は縦長で
-    # 指は掌より長く、細め。
-    finger_lens = [0.56, 0.63, 0.65, 0.54]
+    # 4本指: 短く太い丸指。根元は掌と融合しつつ、先端はしっかり分かれる。
+    finger_lens = [0.34, 0.40, 0.38, 0.30]
     for i, ln in enumerate(finger_lens):
-        x = (i - 1.5) * 0.115
-        fan = (i - 1.5) * 0.035  # 先端の開き（ラジアン）は控えめに
+        x = (i - 1.5) * 0.15
+        fan = (i - 1.5) * 0.11  # 実物は指先が扇状に軽く開く
         half = ln / 2
-        cz = -0.50 - half + 0.18  # 根元を掌に深く埋める
+        cz = -0.54 - half + 0.06  # 根元を掌に軽く埋める（埋めすぎると指が消える）
         cx = x + math.sin(fan) * half
         cap = mb.elements.new(type="CAPSULE")
         cap.co = (cx, 0, cz)
-        cap.radius = 0.09
+        cap.radius = 0.095
         cap.size_x = half
         # CAPSULE の軸は +X。Y軸まわり回転 θ で +X → (cosθ, 0, -sinθ)。
-        # 指はほぼ +Z（対称形状なので符号は不問）、fan だけ傾ける。
         angle = -math.pi / 2 + fan
         cap.rotation = (math.cos(angle / 2), 0, math.sin(angle / 2), 0)
 
-    # 親指: 短めに、掌の縁から斜め下へ分岐（長いと第5の指・触角に見える）。
-    # Y軸回転 θ の軸方向は (cosθ, 0, -sinθ)。下向き斜め＝ z 成分負にする。
+    # 親指: 太く、掌の縁から大きく開く。実物は親指が体側（内向き）に付く。
+    # Y軸回転 θ の軸方向は (cosθ, 0, -sinθ)。
     th = mb.elements.new(type="CAPSULE")
-    tang = math.pi / 2 - side * 0.7 if side > 0 else math.pi / 2 + 0.7
+    tang = math.pi / 2 + 1.2 if side > 0 else math.pi / 2 - 1.2
     tdir = (math.cos(tang), 0, -math.sin(tang))
-    troot = (side * 0.17, 0, -0.46)
-    tlen = 0.13
+    troot = (-side * 0.16, 0, -0.3)
+    tlen = 0.2
     th.co = (troot[0] + tdir[0] * tlen, 0, troot[2] + tdir[2] * tlen)
-    th.radius = 0.085
+    th.radius = 0.1
     th.size_x = tlen
     th.rotation = (math.cos(tang / 2), 0, math.sin(tang / 2), 0)
 
